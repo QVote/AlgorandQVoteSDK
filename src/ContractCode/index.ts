@@ -1,5 +1,6 @@
-export const QVotingApprovalTeal = `
-#pragma version 2
+import * as fs from "fs"
+
+export const QVotingApprovalTeal = `#pragma version 2
 txn ApplicationID
 int 0
 ==
@@ -318,13 +319,11 @@ int 1
 return
 l6: `
 
-export const QVotingClearStateTeal = `
-#pragma version 2
+export const QVotingClearStateTeal = `#pragma version 2
 int 1
 return`
 
-export const QueueApprovalTeal = `
-#pragma version 2
+export const QueueApprovalTeal = `#pragma version 2
 txn ApplicationID
 int 0
 ==
@@ -407,7 +406,6 @@ int 1
 return
 l5: `
 
-export const QueueClearStateTeal = `
-#pragma version 2
+export const QueueClearStateTeal = `#pragma version 2
 int 1
 return`
