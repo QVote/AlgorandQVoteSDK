@@ -1,10 +1,7 @@
 import * as algosdk from "algosdk";
 import * as fs from "fs"
 import * as assert from "assert"
-
-const NULL_OPTION_SYM = "NULL_OPTION"  // NOTE: could store it already encoded 
-const ADD_OPTION_SYM = "add_options"
-const OPTION_SYM = "_option"
+import {ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
 
 
 interface QVoteState {
