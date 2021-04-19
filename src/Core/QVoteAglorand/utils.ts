@@ -4,7 +4,18 @@ import * as assert from "assert"
 
 const NULL_OPTION_SYM = "NULL_OPTION"  // NOTE: could store it already encoded 
 const ADD_OPTION_SYM = "add_options"
+const OPTION_SYM = "_option"
 
+
+interface QVoteState {
+	Name: string,
+	Creator: string, 
+	voting_start_time: number, 
+	voting_end_time: number, 
+	asset_id: number, 
+	asset_coefficient: number
+	// and then the options...
+}
 
 export function loadCompiledPrograms() : {approval: Uint8Array, clearState: Uint8Array}{
 	const approvalRead = fs.readFileSync("../ContractCode/quadratic_voting_approval.teal.tok", {encoding: "base64"})
@@ -12,6 +23,37 @@ export function loadCompiledPrograms() : {approval: Uint8Array, clearState: Uint
 	const clearRead = fs.readFileSync("../ContractCode/quadratic_voting_clear_state.teal.tok", {encoding: "base64"});
 	const clearProgram = new Uint8Array(Buffer.from(clearRead, "base64"))
 	return {approval: approvalProgram, clearState: clearProgram}
+}
+
+function decodeBase64(s: string){
+	return Buffer.from(s, 'base64').toString();
+}
+
+function decodeValue(v: {bytes: string, type: number, uint: number}){
+	return {...v, bytes: Buffer.from(v.bytes, 'base64').toString()};
+}
+
+export async function readGlobalState(client: any, address: string, index: number){
+    const accountInfoResponse = await client.accountInformation(address).do();
+    for (let i = 0; i < accountInfoResponse['created-apps'].length; i++) { 
+        if (accountInfoResponse['created-apps'][i].id == index) {
+			const app = accountInfoResponse['created-apps'][i]
+			const formattedState : QVoteState = app['params']['global-state'].reduce((acc, e) => {
+				const key = decodeBase64(e.key)		
+				return {...acc, [key]: key=="Name" ? decodeValue(e.value) : e.value}; 
+			}, {})
+        }
+    }
+}
+
+
+/* 
+ * returns a function that takes an appID parameter, and when executed returns a tx that adds the options passed
+ */
+export function buildAddOptionTxFunc(creatorAddress: string, params: any, options : string[]){
+	// const params = await this.client.getTransactionParams().do();
+	const appArgs = [ADD_OPTION_SYM].concat(options).map(encodeString)
+	return (appID) => algosdk.makeApplicationNoOpTxn(creatorAddress, params, appID, appArgs)
 }
 
 export const waitForConfirmation = async function (algodclient, txId) {
@@ -27,7 +69,7 @@ export const waitForConfirmation = async function (algodclient, txId) {
         lastRound++;
         await algodclient.statusAfterBlock(lastRound).do();
       }
-    };
+};
 
 export function encodeString(s: string) : Uint8Array {
 	return new Uint8Array(Buffer.from(s));

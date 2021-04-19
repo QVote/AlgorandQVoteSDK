@@ -1,6 +1,6 @@
 import {QVotingApprovalTeal, QVotingClearStateTeal} from "../../ContractCode";
 import * as algosdk from "algosdk";
-import {groupOptions, loadCompiledPrograms, encodeNumber, encodeString, waitForConfirmation} from "./utils"
+import {readGlobalState, buildAddOptionTxFunc,  groupOptions, loadCompiledPrograms, encodeNumber, encodeString, waitForConfirmation} from "./utils"
 import * as assert from "assert"
 
 
@@ -8,14 +8,18 @@ class QVoting{
 	private millisecondsPerTxBlockAverage: number; 
 	private client: any;    // this client cannot sign transactions. It is simply used to call the apis 
 	private deployTxId: string; 
-	private appID: string; 
+	private appID: number; 
+	private creatorAddress: string; 
 
 	/*
 	 * Create a new QVote object from scratch, or create one from an already deployed app by providing the appID
 	 */
-	constructor(millisecondsPerTxBlockAverage: number, token, baseServer, port, appId=undefined){ 
+	constructor(millisecondsPerTxBlockAverage: number, creatorAddress: string, token, baseServer, port, appID=undefined){ 
 		this.millisecondsPerTxBlockAverage = millisecondsPerTxBlockAverage;
 		this.client = new algosdk.Algodv2(token, baseServer, port); // TODO take client params from config file 
+		// TODO automatically call the deploytx if appID is undefined 
+		this.creatorAddress = creatorAddress;
+		this.appID = appID
 	}
 
 	getFutureTxBlockNumber(blockNumber: number, millisecondsToAdd: number): string {
@@ -33,17 +37,8 @@ class QVoting{
 		return appArgs;
 	}
 
-	/* 
-	 * returns a function that takes an appID parameter, and when executed returns a tx that adds the options passed
-	 */
-	async buildAddOptionTxFunc(options : string[]){
-		const params = await this.client.getTransactionParams().do();
-		const appArgs = [ADD_OPTION_SYM].concat(options).map(encodeString)
-		return (appID) => {algosdk.makeApplicationNoOpTxn(creatorAddress, params, appID, appArgs)}
-	}
-
 	/*
-	 * Returns an unsigned transaction for deploying a QVote decision 
+	 E Returns an unsigned transaction for deploying a QVote decision 
 	 */
 	async buildDeployTx(creatorAddress: string,
 						startTime: number, registrationSeconds: number,
@@ -75,11 +70,11 @@ class QVoting{
 		this.deployTxId = appCreateTx.txID().toString();
 
 		// Add option tx generator functions 
-		addOptionFns = groupedOptions.slice(1).map(buildAddOptionTxn))
+		const addOptionFns = groupedOptions.slice(1).map((o) => buildAddOptionTxFunc(creatorAddress, params, o))
 		return {appCreateTx: appCreateTx, addOptionFns: addOptionFns};
 	}
 
-	// do everything in one function, using algosigner. 
+	// do everything in one function, using algosigner. This is for user convenience, if they trust us to sign things with algosigner 
 	// async deployNewDecision()
 	
 	getDeployTxId(){
@@ -101,13 +96,17 @@ class QVoting{
 		// instance has been created from scratch. checking if the app has been deployed 
 		if (typeof this.deployTxId != 'undefined') {
 			const transactionResponse = await this.client.pendingTransactionInformation(this.deployTxId).do();
-			this.appID= transactionResponse['application-index']; 
+			this.appID = transactionResponse['application-index']; 
 			return this.appID; 
 		} else {
 			console.log("Contract has not been deployed yet")
 		}
 	}
 
+	// //TODO turn this into something more readable such as getResults 
+	async readGlobalState(){
+		await readGlobalState(this.client, this.creatorAddress, this.appID);
+	}
 }
 
 export {QVoting}; 
