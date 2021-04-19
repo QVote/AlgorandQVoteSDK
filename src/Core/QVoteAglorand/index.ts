@@ -103,9 +103,8 @@ class QVoting{
 		}
 	}
 
-	// //TODO turn this into something more readable such as getResults 
 	async readGlobalState(){
-		await readGlobalState(this.client, this.creatorAddress, this.appID);
+		return await readGlobalState(this.client, this.creatorAddress, this.appID);
 	}
 }
 

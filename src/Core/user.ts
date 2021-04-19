@@ -62,8 +62,8 @@ async function existingInstance(){
 	try {
 		const qv = new QVoting(1000, creatorAccount.addr, token, baseServer, port, 15386096)
 		console.log('created') 
-		await qv.readGlobalState()	
-		console.log('readstate')
+		const state = await qv.readGlobalState()	
+		console.log(state)
 	} catch (e) {
 		console.log(e);
 	}

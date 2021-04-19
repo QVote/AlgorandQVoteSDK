@@ -42,8 +42,10 @@ export async function readGlobalState(client: any, address: string, index: numbe
 				const key = decodeBase64(e.key)		
 				return {...acc, [key]: key=="Name" ? decodeValue(e.value) : e.value}; 
 			}, {})
+			return formattedState; 
         }
     }
+	console.log("QVote decision not found. Is the creator correct? Has the decision been deployed?")
 }
 
 
