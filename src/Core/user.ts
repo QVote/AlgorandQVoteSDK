@@ -1,6 +1,7 @@
 import {QVoting} from "./QVoteAglorand"
 import * as algosdk from "algosdk" 
 
+
 const baseServer = 'https://testnet-algorand.api.purestake.io/ps2'
 const port = '';
 const token = {
@@ -62,12 +63,22 @@ async function existingInstance(){
 	try {
 		const qv = new QVoting(1000, creatorAccount.addr, token, baseServer, port, 15386096)
 		console.log('created') 
-		const state = await qv.readGlobalState()	
+		const state = await qv.readGlobalState();
+		const results = await qv.getCurrentResults();
 		console.log(state)
+		console.log(results)
 	} catch (e) {
 		console.log(e);
 	}
 }
+
+
+// TODO 
+// voting 
+// add option after deploy
+// convenience deploy as a single function 
+// queue 
+// algosigner 
 
 (async () => {
 	try {
@@ -76,6 +87,5 @@ async function existingInstance(){
 		console.log(e)
 	}
 })(); 
-
 
 

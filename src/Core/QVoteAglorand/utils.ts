@@ -46,6 +46,17 @@ export async function readGlobalState(client: any, address: string, index: numbe
 }
 
 
+export function resultsFromState(state: QVoteState){
+	const results = Object.entries(state).reduce((acc, [key, value]) => {
+		if (key.startsWith(OPTION_SYM)){
+			acc[key.replace(OPTION_SYM, '')] = value.uint - 2**63
+		}
+		return acc; 
+	}, {})
+
+	return results; 
+}
+
 /* 
  * returns a function that takes an appID parameter, and when executed returns a tx that adds the options passed
  */

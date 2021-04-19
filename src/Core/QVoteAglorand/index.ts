@@ -1,8 +1,11 @@
 import {QVotingApprovalTeal, QVotingClearStateTeal} from "../../ContractCode";
 import * as algosdk from "algosdk";
-import {readGlobalState, buildAddOptionTxFunc,  groupOptions, loadCompiledPrograms, encodeNumber, encodeString, waitForConfirmation} from "./utils"
+import {resultsFromState, readGlobalState, buildAddOptionTxFunc, 
+		groupOptions, loadCompiledPrograms, encodeNumber, 
+		encodeString, waitForConfirmation} from "./utils"
 import * as assert from "assert"
 
+import {ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
 
 class QVoting{
 	private millisecondsPerTxBlockAverage: number; 
@@ -81,6 +84,9 @@ class QVoting{
 		return this.deployTxId; 
 	}
 
+	async buildVoteTxs(options: string[]){
+	}
+
 	async sendSignedTx(tx){
 		await this.client.sendRawTransaction(tx).do();
 	}
@@ -105,6 +111,11 @@ class QVoting{
 
 	async readGlobalState(){
 		return await readGlobalState(this.client, this.creatorAddress, this.appID);
+	}
+
+	async getCurrentResults(){
+		const state = await this.readGlobalState(); 
+		return resultsFromState(state);
 	}
 }
 
