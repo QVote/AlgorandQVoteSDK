@@ -4,15 +4,15 @@ import * as assert from "assert"
 import {ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
 
 
-interface QVoteState {
-	Name: string,
-	Creator: string, 
-	voting_start_time: number, 
-	voting_end_time: number, 
-	asset_id: number, 
-	asset_coefficient: number
-	// and then the options...
+export type QVoteState = { // TODO convert these to camelCase at one point 
+	decisionName: string,
+	votingStartTime: number, 
+	votingEndTime: number, 
+	assetID: number, 
+	assetCoefficient: number
+	options: {title: string, value: number}[]
 }
+
 
 export function loadCompiledPrograms() : {approval: Uint8Array, clearState: Uint8Array}{
 	const approvalRead = fs.readFileSync("../ContractCode/quadratic_voting_approval.teal.tok", {encoding: "base64"})
@@ -30,31 +30,36 @@ function decodeValue(v: {bytes: string, type: number, uint: number}){
 	return {...v, bytes: Buffer.from(v.bytes, 'base64').toString()};
 }
 
-export async function readGlobalState(client: any, address: string, index: number){
+export async function readGlobalState(client: any, address: string, index: number) : Promise<QVoteState>{
     const accountInfoResponse = await client.accountInformation(address).do();
     for (let i = 0; i < accountInfoResponse['created-apps'].length; i++) { 
         if (accountInfoResponse['created-apps'][i].id == index) {
 			const app = accountInfoResponse['created-apps'][i]
-			const formattedState : QVoteState = app['params']['global-state'].reduce((acc, e) => {
-				const key = decodeBase64(e.key)		
-				return {...acc, [key]: key=="Name" ? decodeValue(e.value) : e.value}; 
-			}, {})
-			return formattedState; 
-        }
+
+			const rawState = app['params']['global-state'].map(({key, value}) => {
+				const decodedKey = decodeBase64(key)
+				const decodedValue = (decodedKey=="Name") ? decodeValue(value) : value
+				return {key: decodedKey, value: decodedValue}; 
+			}) 
+
+			const formattedState : QVoteState = {
+				options: rawState.filter(({key, value}) => key.startsWith(OPTION_SYM))
+								 .map(opt => ({title: opt.key, value: opt.value - 2**63})),      // taking away the offset for negative votes 
+									 													 // TODO store the offset as a parameter 
+				decisionName: rawState.Name,
+				votingStartTime: rawState.voting_start_time, 
+				votingEndTime: rawState.voting_end_time, 
+				assetID: rawState.asset_id,
+				assetCoefficient: rawState.asset_coefficient,
+			}
+			return formattedState;
+		}
     }
 	console.log("QVote decision not found. Is the creator correct? Has the decision been deployed?")
 }
 
-
 export function resultsFromState(state: QVoteState){
-	const results = Object.entries(state).reduce((acc, [key, value]) => {
-		if (key.startsWith(OPTION_SYM)){
-			acc[key.replace(OPTION_SYM, '')] = value.uint - 2**63
-		}
-		return acc; 
-	}, {})
-
-	return results; 
+	return state.options.reduce((acc, opt) => ({...acc, [opt.title]: opt.value}))
 }
 
 /* 
