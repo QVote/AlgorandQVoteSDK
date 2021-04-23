@@ -4,7 +4,7 @@ import * as assert from "assert"
 import {ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
 
 
-export type QVoteState = { // TODO convert these to camelCase at one point 
+export type QVoteState = { 
 	decisionName: string,
 	votingStartTime: number, 
 	votingEndTime: number, 
@@ -35,23 +35,25 @@ export async function readGlobalState(client: any, address: string, index: numbe
     for (let i = 0; i < accountInfoResponse['created-apps'].length; i++) { 
         if (accountInfoResponse['created-apps'][i].id == index) {
 			const app = accountInfoResponse['created-apps'][i]
-
-			const rawState = app['params']['global-state'].map(({key, value}) => {
+			const rawState = app['params']['global-state'].reduce((acc, {key, value}) => {
 				const decodedKey = decodeBase64(key)
 				const decodedValue = (decodedKey=="Name") ? decodeValue(value) : value
-				return {key: decodedKey, value: decodedValue}; 
-			}) 
-
+				acc[decodedKey] = decodedValue; 
+				return acc;
+			}, {})
 			const formattedState : QVoteState = {
-				options: rawState.filter(({key, value}) => key.startsWith(OPTION_SYM))
-								 .map(opt => ({title: opt.key, value: opt.value - 2**63})),      // taking away the offset for negative votes 
-									 													 // TODO store the offset as a parameter 
-				decisionName: rawState.Name,
-				votingStartTime: rawState.voting_start_time, 
-				votingEndTime: rawState.voting_end_time, 
-				assetID: rawState.asset_id,
-				assetCoefficient: rawState.asset_coefficient,
+				options: Object.entries(rawState).filter(([key, value]) => key.startsWith(OPTION_SYM))
+												 //@ts-ignore
+												 .map(([key, value]) => ({title: key, value: value.uint - 2**63})),
+
+				decisionName: rawState.Name.bytes,
+				votingStartTime: rawState.voting_start_time.uint, 
+				votingEndTime: rawState.voting_end_time.uint, 
+				assetID: rawState.asset_id.uint,
+				assetCoefficient: rawState.asset_coefficient.uint,
 			}
+
+			// TODO check that formattedState is of the right type at runtime 
 			return formattedState;
 		}
     }
@@ -92,6 +94,29 @@ export function encodeString(s: string) : Uint8Array {
 
 export function encodeNumber(n: number){
 	return new Uint8Array([n]);
+}
+
+// TODO make this work both little and big endian
+export function intToByteArray(num: number, size: number): Uint8Array {
+	let x = num;
+	const res: number[] = [];
+
+	while (x > 0) {
+		res.push(x & 255);
+		x = x >> 8;
+	}
+	
+	const pad = size - res.length;
+	for (let i = 0; i < pad; i++) {
+    	// res.unshift(0);
+		res.push(0);
+	}
+
+	return Uint8Array.from(res.reverse());
+}
+
+export function ByteArrayToIntBROKEN(array: Uint8Array){
+	return Buffer.from(array).readUIntBE(0, 6);
 }
 
 export function pad(options: string[]) : string[] {

@@ -1,6 +1,7 @@
 import {QVotingApprovalTeal, QVotingClearStateTeal} from "../../ContractCode";
 import * as algosdk from "algosdk";
-import {resultsFromState, readGlobalState, buildAddOptionTxFunc, 
+import {intToByteArray, 
+		resultsFromState, readGlobalState, buildAddOptionTxFunc, 
 		groupOptions, loadCompiledPrograms, encodeNumber, 
 		encodeString, waitForConfirmation, QVoteState} from "./utils"
 import * as assert from "assert"
@@ -52,19 +53,23 @@ class QVoting{
 		this.millisecondsPerTxBlockAverage = millisecondsPerTxBlockAverage;
 		this.client = new algosdk.Algodv2(token, baseServer, port); // TODO take client params from config file 
 		this.creatorAddress = creatorAddress;
-
-		this.state = {
-			...params, 
-			options: params.options.map(title => ({title, value: 0}))
+		
+		if (typeof params != 'undefined') {
+			this.state = {
+				...params, 
+				options: params.options.map(title => ({title, value: 0}))
+			}
 		}
 		// TODO automatically call buildDeployTxs and return them if params is passed 
 	}
 
 	/*
 	 * Call this after creating the object to get it's state from the blockchain. 
-	 * appID should be passed to take the state of an existing decision. 
+	 * Pass either the appID of newly deployed transactions from the parameters,
+	 * or the appID of an existing qvote decision on the blockchain. 
 	 */
-	async initState(appID? : number){
+	async initState(appID : number){
+		this.appID = appID;
 		if (typeof this.state == 'undefined'){
 			this.state = await this.readGlobalState(); 
 		}
@@ -93,7 +98,7 @@ class QVoting{
 							.concat(options.map(encodeString))
 							.concat([this.state.assetID, this.state.assetCoefficient, 
 									this.state.votingStartTime, this.state.votingEndTime]
-									.map(encodeNumber))
+									.map((n) => intToByteArray(n, 8)))
 		return appArgs;
 	}
 
@@ -120,7 +125,6 @@ class QVoting{
 		const globalInts = options.length + 4
 		const globalBytes = 3;
 		
-		console.log(groupedOptions[0].length) 
 		const appArgs = this.buildQVoteDeployArgs(groupedOptions[0])
 		const appCreateTx =  algosdk.makeApplicationCreateTxn(this.creatorAddress, params, onComplete, 
 												approval, clearState, 
