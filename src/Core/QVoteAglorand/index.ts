@@ -1,13 +1,10 @@
-import {QVotingApprovalTeal, QVotingClearStateTeal} from "../../ContractCode";
 import * as algosdk from "algosdk";
-import {intToByteArray, 
-		resultsFromState, readGlobalState, buildAddOptionTxFunc, 
+import {intToByteArray, readLocalStorage, 
+		readGlobalState, buildAddOptionTxFunc, 
 		groupOptions, loadCompiledPrograms, encodeNumber, 
 		encodeString, waitForConfirmation, QVoteState} from "./utils"
 import * as assert from "assert"
-
-import {ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
-
+import {VOTE_SYM, ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
 
 /*
  * Parameters of the contract for QVoting.
@@ -29,11 +26,6 @@ interface config {
 	baseServer: any, 
 	port: any
 }			
-
-interface params {
-	newDecisionParams: QVoteParams | undefined,
-	appID: number | undefined
-}
 
 class QVoting{
 
@@ -145,7 +137,40 @@ class QVoting{
 		return this.deployTxId; 
 	}
 
-	async buildVoteTxs(options: string[]){
+	async buildOptInTx(userAddresses : string){
+		const params = await this.client.getTransactionParams().do();
+		const txn = algosdk.makeApplicationOptInTxn(userAddresses, params, this.appID);	
+		return txn; 
+	}
+
+	async getUserBalance(userAddress: string){ 
+		const storage = await readLocalStorage(this.client, userAddress, this.appID)
+		if (typeof storage == 'undefined'){
+			console.log('user is not registered. Have you waited for the optin tx to confirm?') 
+		} else {
+			// storage will always be length 1 if the app is qvote. unless we extend the fuctionality of qvote. then we will update this sdk. 
+			return {[storage[0].key]: storage[0].value.uint}
+		}
+	}
+
+	// TODO fix precision, multiply credits by 10000 and divide results by 100
+	async buildVoteTxs(userAddress: string, options: {optionTitle: string, creditNumber: number}[]){ 
+		const params = await this.client.getTransactionParams().do();
+		var o = options[0]
+		console.log(o.creditNumber)
+		console.log(Math.round(Math.sqrt(Math.abs(o.creditNumber))))
+		console.log(intToByteArray(Math.round(Math.sqrt(Math.abs(o.creditNumber))), 2))
+		return options.map(o => algosdk.makeApplicationNoOpTxn(
+					userAddress, 
+					params, 
+					this.appID, 
+					[
+						encodeString(VOTE_SYM), 
+						encodeString(o.optionTitle), 
+						intToByteArray(Math.round(Math.sqrt(Math.abs(o.creditNumber))), 2),   		// TODO check 2 bytes are enough in all cases  
+						encodeString((Math.sign(o.creditNumber) < 0) ? "-" : "+")
+					])
+		)
 	}
 
 	async sendSignedTx(tx){
@@ -170,14 +195,10 @@ class QVoting{
 		}
 	}
 
-	async readGlobalState(){
+	async readGlobalState(){   
 		return await readGlobalState(this.client, this.creatorAddress, this.appID);
 	}
 
-	async getCurrentResults(){
-		const state = await this.readGlobalState(); 
-		return resultsFromState(state);
-	}
 }
 
 export {QVoting}; 

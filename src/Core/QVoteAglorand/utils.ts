@@ -14,6 +14,7 @@ export type QVoteState = {
 }
 
 
+// TODO maybe read this from ContractCode index file 
 export function loadCompiledPrograms() : {approval: Uint8Array, clearState: Uint8Array}{
 	const approvalRead = fs.readFileSync("../ContractCode/quadratic_voting_approval.teal.tok", {encoding: "base64"})
 	const approvalProgram = new Uint8Array(Buffer.from(approvalRead, "base64"))
@@ -35,16 +36,18 @@ export async function readGlobalState(client: any, address: string, index: numbe
     for (let i = 0; i < accountInfoResponse['created-apps'].length; i++) { 
         if (accountInfoResponse['created-apps'][i].id == index) {
 			const app = accountInfoResponse['created-apps'][i]
+			console.log(app)
 			const rawState = app['params']['global-state'].reduce((acc, {key, value}) => {
 				const decodedKey = decodeBase64(key)
 				const decodedValue = (decodedKey=="Name") ? decodeValue(value) : value
 				acc[decodedKey] = decodedValue; 
 				return acc;
 			}, {})
+			console.log(rawState);
 			const formattedState : QVoteState = {
 				options: Object.entries(rawState).filter(([key, value]) => key.startsWith(OPTION_SYM))
 												 //@ts-ignore
-												 .map(([key, value]) => ({title: key, value: value.uint - 2**63})),
+												 .map(([key, value]) => ({title: key, value: value.uint - 2**32})),
 
 				decisionName: rawState.Name.bytes,
 				votingStartTime: rawState.voting_start_time.uint, 
@@ -60,9 +63,18 @@ export async function readGlobalState(client: any, address: string, index: numbe
 	console.log("QVote decision not found. Is the creator correct? Has the decision been deployed?")
 }
 
-export function resultsFromState(state: QVoteState){
-	return state.options.reduce((acc, opt) => ({...acc, [opt.title]: opt.value}))
+
+export async function readLocalStorage(client, userAddress, appID){
+	let accountInfoResponse = await client.accountInformation(userAddress).do();
+    for (let i = 0; i < accountInfoResponse['apps-local-state'].length; i++) { 
+        if (accountInfoResponse['apps-local-state'][i].id == appID) {
+            console.log("User's local state:");
+			const state = accountInfoResponse['apps-local-state'][i][`key-value`];
+			return state.map(({key, value}) => ({key: decodeBase64(key), value})); 	
+		}
+    }
 }
+
 
 /* 
  * returns a function that takes an appID parameter, and when executed returns a tx that adds the options passed
