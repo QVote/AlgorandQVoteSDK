@@ -2,6 +2,7 @@ import * as algosdk from "algosdk";
 import * as fs from "fs"
 import * as assert from "assert"
 import {ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
+import {qvApprovalProgram, qvClearProgram} from "../../ContractCode"
 
 
 export type QVoteState = { 
@@ -16,11 +17,11 @@ export type QVoteState = {
 
 // TODO maybe read this from ContractCode index file 
 export function loadCompiledPrograms() : {approval: Uint8Array, clearState: Uint8Array}{
-	const approvalRead = fs.readFileSync("../ContractCode/quadratic_voting_approval.teal.tok", {encoding: "base64"})
+	/*const approvalRead = fs.readFileSync("../ContractCode/quadratic_voting_approval.teal.tok", {encoding: "base64"})
 	const approvalProgram = new Uint8Array(Buffer.from(approvalRead, "base64"))
 	const clearRead = fs.readFileSync("../ContractCode/quadratic_voting_clear_state.teal.tok", {encoding: "base64"});
-	const clearProgram = new Uint8Array(Buffer.from(clearRead, "base64"))
-	return {approval: approvalProgram, clearState: clearProgram}
+	const clearProgram = new Uint8Array(Buffer.from(clearRead, "base64")) */
+	return {approval: qvApprovalProgram, clearState: qvClearProgram}
 }
 
 function decodeBase64(s: string){

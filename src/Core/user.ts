@@ -17,7 +17,7 @@ const userAccount = algosdk.mnemonicToSecretKey(userMnemonic);
 /*
  * Build object, get txs, deploy, init object to deployed contract, use object 
  */
-async function deployNew () {
+export async function deployNew() {
 	try{
 		const conf = {token: token, baseServer: baseServer, port: port}
 		const registrationTime = 60;  // in seconds 
@@ -85,7 +85,7 @@ async function deployNew () {
 /*
  * Build object, init from existing appID state, use object 
  */
-async function existingInstance(){
+export async function existingInstance(){
 	try {
 		const conf = {token: token, baseServer: baseServer, port: port}
 		const qv = new QVoting(creatorAccount.addr, 10, conf)
@@ -126,7 +126,6 @@ async function existingInstance(){
 		console.log('userBalance')
 		console.log(userBalance) 
 
-
 	} catch (e) {
 		console.log(e);
 	}
@@ -135,8 +134,7 @@ async function existingInstance(){
 
 // TODO 
 // --- QVoting
-// FIX READSTATE, for some reason the votes show in the block explorer, not when reading state here 
-// test voting
+// more test voting / cheating 
 // add option after deploy (only need to test, this should already work) 
 // convenience deploy as a single function 
 // --- queue 
@@ -145,8 +143,8 @@ async function existingInstance(){
 
 (async () => {
 	try {
-		// await deployNew(); 
-		await existingInstance();
+		await deployNew(); 
+		// await existingInstance();
 	} catch (e) {
 		console.log(e)
 	}
