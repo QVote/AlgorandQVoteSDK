@@ -1,6 +1,6 @@
 import * as algosdk from "algosdk";
 import * as fs from "fs"
-import * as assert from "assert"
+// import * as assert from "assert"
 import {ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
 import {qvApprovalProgram, qvClearProgram} from "../../ContractCode"
 
@@ -133,7 +133,7 @@ export function ByteArrayToIntBROKEN(array: Uint8Array){
 }
 
 export function pad(options: string[]) : string[] {
-	assert(options.length <= 5)
+	// assert(options.length <= 5)
 	for (var i=0; options.length < 5; i++) {
 		options.push(NULL_OPTION_SYM); 
 	}

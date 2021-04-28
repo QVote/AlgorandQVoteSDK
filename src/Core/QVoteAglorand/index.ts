@@ -3,7 +3,7 @@ import {intToByteArray, readLocalStorage,
 		readGlobalState, buildAddOptionTxFunc, 
 		groupOptions, loadCompiledPrograms, encodeNumber, 
 		encodeString, waitForConfirmation, QVoteState} from "./utils"
-import * as assert from "assert"
+//import * as assert from "assert"
 import {VOTE_SYM, ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
 
 /*
@@ -85,7 +85,7 @@ class QVoting{
 	 * takes one grouped option entry and returns arguments to be passed to build the tx 
 	 */
 	buildQVoteDeployArgs(options: string[]) : Uint8Array[]{
-		assert(options.length <= 5) 
+		// assert(options.length <= 5) 
 		const appArgs = [encodeString(this.state.decisionName)]
 							.concat(options.map(encodeString))
 							.concat([this.state.assetID, this.state.assetCoefficient, 
@@ -103,7 +103,7 @@ class QVoting{
 		// A function could feed either one based on the parameters passed
 		
 		const {decisionName, votingStartTime, votingEndTime, assetID, assetCoefficient, options} = this.state;
-		assert(options.length <= 57)    // won't fit in the contract otherwise 
+		// assert(options.length <= 57)    // won't fit in the contract otherwise 
 		var txs = []
 
 		// Application Creation tx 
