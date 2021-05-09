@@ -30,6 +30,7 @@ interface config {
 
 export type SignMethod = "raw" | "algosigner" | "myalgo"; 
 
+// TODO figure out a coherent way of handling transaction params, without calling them every 2 seconds 
 
 class QVoting{
 
@@ -106,6 +107,7 @@ class QVoting{
         return appArgs;
     }
 
+	// TODO remove this 
 	replaceFromWithBase64String(tx: any, address: string){
 		tx["from"] = address;
 		return tx; 
@@ -232,16 +234,6 @@ class QVoting{
 		await this.waitForConfirmation(txID);
 	}
 
-	async getUserBalance(userAddress: string){ 
-		const storage = await readLocalStorage(this.client, userAddress, this.appID)
-		if (typeof storage == 'undefined'){
-			console.log('user is not registered. Have you waited for the optin tx to confirm?') 
-		} else {
-			// storage will always be length 1 if the app is qvote. unless we extend the fuctionality of qvote. then we will update this sdk. 
-			return {[storage[0].key]: storage[0].value.uint}
-		}
-	}
-
 	// TODO fix precision, multiply credits by 10000 and divide results by 100
 	async buildVoteTxs(userAddress: string, options: {optionTitle: string, creditNumber: number}[]){ 
 		const params = await this.client.getTransactionParams().do();
@@ -262,6 +254,33 @@ class QVoting{
 		)
 	}
 
+
+	async vote(userAddress: string, options: {optionTitle: string, creditNumber: number}[]){
+		const txParams = await this.client.getTransactionParams().do(); 
+		var txs = await this.buildVoteTxs(userAddress, options) 
+		txs = txs.map(tx => this.replaceFromWithBase64String(tx, userAddress))
+				 .map(tx => {tx['genesisHash'] = txParams['genesisHash']; return tx})
+		console.log(txs) 
+
+		const signedTxs = await this.wallet.signTransaction(txs) 
+		const addOptiontxIDs = signedTxs.map(tx => tx.txID) 
+
+		console.log(signedTxs) 
+		signedTxs.map(tx => this.sendSignedTx(tx.blob))
+		addOptiontxIDs.map(txID => {this.waitForConfirmation(txID)})
+		console.log('voted') 
+	}
+
+
+	async getUserBalance(userAddress: string){ 
+		const storage = await readLocalStorage(this.client, userAddress, this.appID)
+		if (typeof storage == 'undefined'){
+			console.log('user is not registered. Have you waited for the optin tx to confirm?') 
+		} else {
+			// storage will always be length 1 if the app is qvote. unless we extend the fuctionality of qvote. then we will update this sdk. 
+			return {[storage[0].key]: storage[0].value.uint}
+		}
+	}
 
 	async sendSignedTx(tx){
 		await this.client.sendRawTransaction(tx).do();
