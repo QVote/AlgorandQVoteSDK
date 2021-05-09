@@ -37,14 +37,12 @@ export async function readGlobalState(client: any, address: string, index: numbe
     for (let i = 0; i < accountInfoResponse['created-apps'].length; i++) { 
         if (accountInfoResponse['created-apps'][i].id == index) {
 			const app = accountInfoResponse['created-apps'][i]
-			console.log(app)
 			const rawState = app['params']['global-state'].reduce((acc, {key, value}) => {
 				const decodedKey = decodeBase64(key)
 				const decodedValue = (decodedKey=="Name") ? decodeValue(value) : value
 				acc[decodedKey] = decodedValue; 
 				return acc;
 			}, {})
-			console.log(rawState);
 			const formattedState : QVoteState = {
 				options: Object.entries(rawState).filter(([key, value]) => key.startsWith(OPTION_SYM))
 												 //@ts-ignore
@@ -69,7 +67,6 @@ export async function readLocalStorage(client, userAddress, appID){
 	let accountInfoResponse = await client.accountInformation(userAddress).do();
     for (let i = 0; i < accountInfoResponse['apps-local-state'].length; i++) { 
         if (accountInfoResponse['apps-local-state'][i].id == appID) {
-            console.log("User's local state:");
 			const state = accountInfoResponse['apps-local-state'][i][`key-value`];
 			return state.map(({key, value}) => ({key: decodeBase64(key), value})); 	
 		}

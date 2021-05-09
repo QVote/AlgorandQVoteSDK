@@ -18,7 +18,8 @@ export type QVoteParams = { // TODO convert these to camelCase at one point
 	votingEndTime: number, 
 	assetID: number, 
 	assetCoefficient: number,
-	options: string[]
+	options: string[],
+	creatorAddress: string
 }
 
 interface config {
@@ -39,21 +40,24 @@ class QVoting{
 	private state: QVoteState; 
 	private signMethod : SignMethod;
 	private wallet : any; 
+	private indexerClient : any; 
 
 	/*
 	 * Create a new QVote object from scratch, or create one from an already deployed app by providing the appID
 	 */
 	// TODO can we get the creatorAddress from the appID? 
-	constructor(creatorAddress: string, conf: config, signMethod: SignMethod, wallet : any,  params? : QVoteParams){
+	constructor(conf: config, signMethod: SignMethod, wallet : any,  params? : QVoteParams){
 		const {token, baseServer, port} = conf; 
 		this.client = new algosdk.Algodv2(token, baseServer, port); // TODO take client params from config file 
-		this.creatorAddress = creatorAddress;
+		this.indexerClient = new algosdk.Indexer(token, baseServer , port);
+
 		this.signMethod = signMethod;
 
 		// check thgat signmethod and wallet match 
 		this.wallet = wallet;
 		
 		if (typeof params != 'undefined') {
+			this.creatorAddress = params.creatorAddress; 
 			this.state = {
 				...params, 
 				options: params.options.map(title => ({title, value: 0}))
@@ -69,6 +73,9 @@ class QVoting{
 	 */
 	async initState(appID : number){
 		this.appID = appID;
+		// TODO fill the state form the app data, don't make another call
+		const appData = await this.indexerClient.lookupApplications(appID).do(); 
+		this.creatorAddress = appData.params.creator
 		if (typeof this.state == 'undefined'){
 			this.state = await this.readGlobalState(); 
 		}
@@ -99,8 +106,8 @@ class QVoting{
         return appArgs;
     }
 
-	replaceAddressWithBase64String(tx){
-		tx["from"] = this.creatorAddress
+	replaceFromWithBase64String(tx: any, address: string){
+		tx["from"] = address;
 		return tx; 
 	}
 
@@ -147,7 +154,7 @@ class QVoting{
 
 		// Creating Application 
 		console.log('deploying app') 
-		appCreateTx = this.replaceAddressWithBase64String(appCreateTx) 
+		appCreateTx['from'] = this.creatorAddress	
 		delete appCreateTx["appIndex"]      // apparently it thinks this is an app call otherwise 
 		
 		console.log(appCreateTx)
@@ -172,13 +179,10 @@ class QVoting{
 			console.log('adding options') 
 
 			const addOptionTxs = addOptionFns.map(f => f(this.appID))
-									.map(tx => this.replaceAddressWithBase64String(tx))
+									.map(tx => this.replaceFromWithBase64String(tx, this.creatorAddress))
 									.map(tx => {tx['genesisHash'] = txParams['genesisHash']; return tx})
 
 			console.log('good', addOptionTxs)
-
-			// const addOptionTxs = addOptionFns.map(f => {return this.replaceAddressWithBase64String(f(this.appID))})
-			// console.log('bad', addOptionTxs)		
 
 			// if length is 1 don't use map later down. 
 			const signedAddOtionTxs = await this.wallet.signTransaction(addOptionTxs) 
@@ -197,10 +201,35 @@ class QVoting{
 		return this.deployTxId; 
 	}
 
-	async buildOptInTx(userAddresses : string){
+	async buildOptInTx(userAddress: string){
 		const params = await this.client.getTransactionParams().do();
-		const txn = algosdk.makeApplicationOptInTxn(userAddresses, params, this.appID);	
+		const txn = algosdk.makeApplicationOptInTxn(userAddress, params, this.appID);	
 		return txn; 
+	}
+
+	async optIn(userAddress : string){
+		var tx = await this.buildOptInTx(userAddress)
+		console.log(tx)
+
+		const txParams = await this.client.getTransactionParams().do();
+		tx['from'] = userAddress
+		tx['genesisHash'] = txParams['genesisHash'];
+		tx['appArgs'] = []
+		delete tx['tag']
+		delete tx['lease']
+		delete tx['note']
+		console.log(tx)
+
+		const signedTxn = await this.wallet.signTransaction(tx)
+		const txID = signedTxn.txID;
+
+		console.log(signedTxn)
+		console.log("Signed transaction with txID: %s", this.deployTxId);
+
+		await this.sendSignedTx(signedTxn.blob)
+		console.log("SENT")
+
+		await this.waitForConfirmation(txID);
 	}
 
 	async getUserBalance(userAddress: string){ 
