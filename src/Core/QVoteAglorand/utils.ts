@@ -1,5 +1,4 @@
 import * as algosdk from "algosdk";
-import * as fs from "fs"
 // import * as assert from "assert"
 import {ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
 import {qvApprovalProgram, qvClearProgram} from "../../ContractCode"
@@ -34,6 +33,7 @@ function decodeValue(v: {bytes: string, type: number, uint: number}){
 
 export async function readGlobalState(client: any, address: string, index: number) : Promise<QVoteState>{
     const accountInfoResponse = await client.accountInformation(address).do();
+	const div = 100 		 // divide by this for 2 decimal place precision 
     for (let i = 0; i < accountInfoResponse['created-apps'].length; i++) { 
         if (accountInfoResponse['created-apps'][i].id == index) {
 			const app = accountInfoResponse['created-apps'][i]
@@ -46,7 +46,7 @@ export async function readGlobalState(client: any, address: string, index: numbe
 			const formattedState : QVoteState = {
 				options: Object.entries(rawState).filter(([key, value]) => key.startsWith(OPTION_SYM))
 												 //@ts-ignore
-												 .map(([key, value]) => ({title: key, value: value.uint - 2**32})),
+												 .map(([key, value]) => ({title: key, value: (value.uint - 2**32) / div})),
 
 				decisionName: rawState.Name.bytes,
 				votingStartTime: rawState.voting_start_time.uint, 
@@ -55,7 +55,6 @@ export async function readGlobalState(client: any, address: string, index: numbe
 				assetCoefficient: rawState.asset_coefficient.uint,
 			}
 
-			// TODO check that formattedState is of the right type at runtime 
 			return formattedState;
 		}
     }

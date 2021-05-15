@@ -11,8 +11,7 @@ import {VOTE_SYM, ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
  */
 // type QVoteParams = QVoteState & {options: string[]}      // replace options 
 
-// TODO can we declare this in terms of QVoteState, basically the same thing with options : {title: string, value: number}[]
-export type QVoteParams = { // TODO convert these to camelCase at one point 
+export type QVoteParams = { 
 	decisionName: string,
 	votingStartTime: number, 
 	votingEndTime: number, 
@@ -28,7 +27,7 @@ interface config {
 	port: any
 }			
 
-export type SignMethod = "raw" | "algosigner" | "myalgo"; 
+export type SignMethod = "raw" | "myalgo"; 
 
 // TODO figure out a coherent way of handling transaction params, without calling them every 2 seconds 
 
@@ -46,7 +45,6 @@ class QVoting{
 	/*
 	 * Create a new QVote object from scratch, or create one from an already deployed app by providing the appID
 	 */
-	// TODO can we get the creatorAddress from the appID? 
 	constructor(conf: config, signMethod: SignMethod, wallet : any,  params? : QVoteParams){
 		const {token, baseServer, port} = conf; 
 		this.client = new algosdk.Algodv2(token, baseServer, port); // TODO take client params from config file 
@@ -64,7 +62,6 @@ class QVoting{
 				options: params.options.map(title => ({title, value: 0}))
 			}
 		}
-		// TODO automatically call buildDeployTxs and return them if params is passed 
 	}
 
 	/*
@@ -76,6 +73,8 @@ class QVoting{
 		this.appID = appID;
 		// TODO fill the state form the app data, don't make another call
 		const appData = await this.indexerClient.lookupApplications(appID).do(); 
+		console.log(appData)
+
 		this.creatorAddress = appData.params.creator
 		if (typeof this.state == 'undefined'){
 			this.state = await this.readGlobalState(); 
@@ -90,7 +89,9 @@ class QVoting{
 		return this.state.options.map(o => o.title); 	
 	}
 
-	// TODO make other getters 
+	getResults() : {title: string, value: number}[] { 
+		return this.state.options;
+	}
 	
 	/*
 	 * takes one grouped option entry and returns arguments to be passed to build the tx 
@@ -107,22 +108,16 @@ class QVoting{
         return appArgs;
     }
 
-	// TODO remove this 
-	replaceFromWithBase64String(tx: any, address: string){
-		tx["from"] = address;
-		return tx; 
-	}
-
 	/*
 	 * Returns an unsigned transaction for deploying a QVote decision 
 	 */
 	async buildDeployTxs(){
-		// Even though we are using state here, we don't have to initialize. You shouldn't call this method if you created the object with an appID
-		// TODO, maybe we should make to classes that inherit a base QVoteSDK, one for existing contracts, another for new ones. 
-		// A function could feed either one based on the parameters passed
 			
 		const {decisionName, votingStartTime, votingEndTime, assetID, assetCoefficient, options} = this.state;
-		// assert(options.length <= 57)    // won't fit in the contract otherwise 
+		if (options.length >= 57){
+			throw 'too many options, limit is 57'    // TODO check this 
+		}
+
 		var txs = []
 
 		// Application Creation tx 
@@ -147,6 +142,21 @@ class QVoting{
 		const addOptionFns = groupedOptions.slice(1).map((o) => buildAddOptionTxFunc(this.creatorAddress, params, o))
 		return {appCreateTx: appCreateTx, addOptionFns: addOptionFns};
 	}
+
+	async myAlgoPreprocessAddOptionTxs(txs){
+		const txParams = await this.client.getTransactionParams().do();
+		txs.map(tx => {txs['from'] = this.creatorAddress; return txs})
+		   .map(tx => {txs['genesisHash'] = txParams; return txs})
+		return txs
+	}
+
+	async myAlgoPreprocessVoteTxs(txs, userAddress){
+		const txParams = await this.client.getTransactionParams().do();
+		txs.map(tx => {txs['from'] = userAddress; return txs})
+		   .map(tx => {txs['genesisHash'] = txParams; return txs})
+		return txs
+	}
+
 
 	async deployNew() {
 		if (typeof this.state == 'undefined') {
@@ -174,15 +184,13 @@ class QVoting{
 
 		this.appID = await this.getAppId()
 
-		const txParams = await this.client.getTransactionParams().do();
-
 		// Adding Options
 		if (addOptionFns.length > 0){
 			console.log('adding options') 
 
-			const addOptionTxs = addOptionFns.map(f => f(this.appID))
-									.map(tx => this.replaceFromWithBase64String(tx, this.creatorAddress))
-									.map(tx => {tx['genesisHash'] = txParams['genesisHash']; return tx})
+			const addOptionTxs = await this.myAlgoPreprocessAddOptionTxs(addOptionFns.map(f => f(this.appID)))
+									// .map(tx => this.replaceFromWithBase64String(tx, this.creatorAddress))
+									// .map(tx => {tx['genesisHash'] = txParams['genesisHash']; return tx})
 
 			console.log('good', addOptionTxs)
 
@@ -241,6 +249,7 @@ class QVoting{
 		console.log(o.creditNumber)
 		console.log(Math.round(Math.sqrt(Math.abs(o.creditNumber))))
 		console.log(intToByteArray(Math.round(Math.sqrt(Math.abs(o.creditNumber))), 2))
+		const mul = 10000  			// to achieve 2 decimal point precision we multiply by 10^4 before taking the square root
 		return options.map(o => algosdk.makeApplicationNoOpTxn(
 					userAddress, 
 					params, 
@@ -254,12 +263,14 @@ class QVoting{
 		)
 	}
 
-
 	async vote(userAddress: string, options: {optionTitle: string, creditNumber: number}[]){
 		const txParams = await this.client.getTransactionParams().do(); 
 		var txs = await this.buildVoteTxs(userAddress, options) 
-		txs = txs.map(tx => this.replaceFromWithBase64String(tx, userAddress))
-				 .map(tx => {tx['genesisHash'] = txParams['genesisHash']; return tx})
+		txs = await this.myAlgoPreprocessVoteTxs(txs, userAddress)
+		
+		// txs = txs.map(tx => this.replaceFromWithBase64String(tx, userAddress))
+		// 		 .map(tx => {tx['genesisHash'] = txParams['genesisHash']; return tx})
+
 		console.log(txs) 
 
 		const signedTxs = await this.wallet.signTransaction(txs) 
