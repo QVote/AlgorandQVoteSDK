@@ -1,5 +1,4 @@
 import * as algosdk from "algosdk";
-// import * as assert from "assert"
 import {ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
 import {qvApprovalProgram, qvClearProgram} from "../../ContractCode"
 
@@ -14,12 +13,7 @@ export type QVoteState = {
 }
 
 
-// TODO maybe read this from ContractCode index file 
 export function loadCompiledPrograms() : {approval: Uint8Array, clearState: Uint8Array}{
-	/*const approvalRead = fs.readFileSync("../ContractCode/quadratic_voting_approval.teal.tok", {encoding: "base64"})
-	const approvalProgram = new Uint8Array(Buffer.from(approvalRead, "base64"))
-	const clearRead = fs.readFileSync("../ContractCode/quadratic_voting_clear_state.teal.tok", {encoding: "base64"});
-	const clearProgram = new Uint8Array(Buffer.from(clearRead, "base64")) */
 	return {approval: qvApprovalProgram, clearState: qvClearProgram}
 }
 
@@ -32,6 +26,7 @@ function decodeValue(v: {bytes: string, type: number, uint: number}){
 }
 
 export async function readGlobalState(client: any, address: string, index: number) : Promise<QVoteState>{
+	// NOTE decimalPlaces is a temporary hack, until the contracts handle decimal points 
     const accountInfoResponse = await client.accountInformation(address).do();
 	const div = 100 		 // divide by this for 2 decimal place precision 
     for (let i = 0; i < accountInfoResponse['created-apps'].length; i++) { 
@@ -52,7 +47,7 @@ export async function readGlobalState(client: any, address: string, index: numbe
 				votingStartTime: rawState.voting_start_time.uint, 
 				votingEndTime: rawState.voting_end_time.uint, 
 				assetID: rawState.asset_id.uint,
-				assetCoefficient: rawState.asset_coefficient.uint,
+				assetCoefficient: rawState.asset_coefficient.uint,   
 			}
 
 			return formattedState;
@@ -77,7 +72,6 @@ export async function readLocalStorage(client, userAddress, appID){
  * returns a function that takes an appID parameter, and when executed returns a tx that adds the options passed
  */
 export function buildAddOptionTxFunc(creatorAddress: string, params: any, options : string[]){
-	// const params = await this.client.getTransactionParams().do();
 	const appArgs = [ADD_OPTION_SYM].concat(options).map(encodeString)
 	return (appID) => algosdk.makeApplicationNoOpTxn(creatorAddress, params, appID, appArgs)
 }
@@ -118,7 +112,6 @@ export function intToByteArray(num: number, size: number): Uint8Array {
 	
 	const pad = size - res.length;
 	for (let i = 0; i < pad; i++) {
-    	// res.unshift(0);
 		res.push(0);
 	}
 
@@ -130,7 +123,9 @@ export function ByteArrayToIntBROKEN(array: Uint8Array){
 }
 
 export function pad(options: string[]) : string[] {
-	// assert(options.length <= 5)
+	if (options.length > 5){
+		throw "You passed more than 5 options at the same time to be padded. You can't do that. "
+	}
 	for (var i=0; options.length < 5; i++) {
 		options.push(NULL_OPTION_SYM); 
 	}

@@ -10,7 +10,6 @@ import {VOTE_SYM, ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
  * Parameters of the contract for QVoting.
  */
 // type QVoteParams = QVoteState & {options: string[]}      // replace options 
-
 export type QVoteParams = { 
 	decisionName: string,
 	votingStartTime: number, 
@@ -29,8 +28,6 @@ interface config {
 
 export type SignMethod = "raw" | "myalgo"; 
 
-// TODO figure out a coherent way of handling transaction params, without calling them every 2 seconds 
-
 class QVoting{
 
 	private client: any;    // this client cannot sign transactions. It is simply used to call the apis 
@@ -41,6 +38,8 @@ class QVoting{
 	private signMethod : SignMethod;
 	private wallet : any; 
 	private indexerClient : any; 
+
+	private decimalPlaces = 1;
 
 	/*
 	 * Create a new QVote object from scratch, or create one from an already deployed app by providing the appID
@@ -98,6 +97,9 @@ class QVoting{
 	 */
 	buildQVoteDeployArgs(options: string[]) : Uint8Array[]{
         // assert(options.length <= 5)
+		if (options.length > 5){
+			throw 'Options can be at most 5 at creation. Build other AddOption txs for the remaining ones.'
+		}
 		console.log(this.state.decisionName) 
 		console.log(options)
         const appArgs = [encodeString(this.state.decisionName)]
@@ -145,18 +147,15 @@ class QVoting{
 
 	async myAlgoPreprocessAddOptionTxs(txs){
 		const txParams = await this.client.getTransactionParams().do();
-		txs.map(tx => {txs['from'] = this.creatorAddress; return txs})
-		   .map(tx => {txs['genesisHash'] = txParams; return txs})
-		return txs
+		return txs.map(tx => {tx['from'] = this.creatorAddress; return tx})
+		   .map(tx => {tx['genesisHash'] = txParams['genesisHash']; return tx})
 	}
 
-	async myAlgoPreprocessVoteTxs(txs, userAddress){
+	async myAlgoPreprocessVoteTxs(txs, userAddress: string){
 		const txParams = await this.client.getTransactionParams().do();
-		txs.map(tx => {txs['from'] = userAddress; return txs})
-		   .map(tx => {txs['genesisHash'] = txParams; return txs})
-		return txs
+		return txs.map(tx => {tx['from'] = userAddress; return tx})
+		          .map(tx => {tx['genesisHash'] = txParams['genesisHash']; return tx})
 	}
-
 
 	async deployNew() {
 		if (typeof this.state == 'undefined') {
@@ -242,14 +241,9 @@ class QVoting{
 		await this.waitForConfirmation(txID);
 	}
 
-	// TODO fix precision, multiply credits by 10000 and divide results by 100
 	async buildVoteTxs(userAddress: string, options: {optionTitle: string, creditNumber: number}[]){ 
 		const params = await this.client.getTransactionParams().do();
 		var o = options[0]
-		console.log(o.creditNumber)
-		console.log(Math.round(Math.sqrt(Math.abs(o.creditNumber))))
-		console.log(intToByteArray(Math.round(Math.sqrt(Math.abs(o.creditNumber))), 2))
-		const mul = 10000  			// to achieve 2 decimal point precision we multiply by 10^4 before taking the square root
 		return options.map(o => algosdk.makeApplicationNoOpTxn(
 					userAddress, 
 					params, 
@@ -257,21 +251,16 @@ class QVoting{
 					[
 						encodeString(VOTE_SYM), 
 						encodeString(o.optionTitle), 
-						intToByteArray(Math.round(Math.sqrt(Math.abs(o.creditNumber))), 2),   		// TODO check 2 bytes are enough in all cases  
+						// votes are multiplied to whatever decimal places are being displayed 
+						intToByteArray(Math.round(10**this.decimalPlaces*Math.sqrt(Math.abs(o.creditNumber))), 3), 	
 						encodeString((Math.sign(o.creditNumber) < 0) ? "-" : "+")
 					])
 		)
 	}
 
 	async vote(userAddress: string, options: {optionTitle: string, creditNumber: number}[]){
-		const txParams = await this.client.getTransactionParams().do(); 
 		var txs = await this.buildVoteTxs(userAddress, options) 
 		txs = await this.myAlgoPreprocessVoteTxs(txs, userAddress)
-		
-		// txs = txs.map(tx => this.replaceFromWithBase64String(tx, userAddress))
-		// 		 .map(tx => {tx['genesisHash'] = txParams['genesisHash']; return tx})
-
-		console.log(txs) 
 
 		const signedTxs = await this.wallet.signTransaction(txs) 
 		const addOptiontxIDs = signedTxs.map(tx => tx.txID) 
