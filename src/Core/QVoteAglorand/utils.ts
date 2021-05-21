@@ -1,6 +1,4 @@
 import * as algosdk from "algosdk";
-import * as fs from "fs"
-// import * as assert from "assert"
 import {ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
 import {qvApprovalProgram, qvClearProgram} from "../../ContractCode"
 
@@ -15,12 +13,7 @@ export type QVoteState = {
 }
 
 
-// TODO maybe read this from ContractCode index file 
 export function loadCompiledPrograms() : {approval: Uint8Array, clearState: Uint8Array}{
-	/*const approvalRead = fs.readFileSync("../ContractCode/quadratic_voting_approval.teal.tok", {encoding: "base64"})
-	const approvalProgram = new Uint8Array(Buffer.from(approvalRead, "base64"))
-	const clearRead = fs.readFileSync("../ContractCode/quadratic_voting_clear_state.teal.tok", {encoding: "base64"});
-	const clearProgram = new Uint8Array(Buffer.from(clearRead, "base64")) */
 	return {approval: qvApprovalProgram, clearState: qvClearProgram}
 }
 
@@ -33,31 +26,30 @@ function decodeValue(v: {bytes: string, type: number, uint: number}){
 }
 
 export async function readGlobalState(client: any, address: string, index: number) : Promise<QVoteState>{
+	// NOTE decimalPlaces is a temporary hack, until the contracts handle decimal points 
     const accountInfoResponse = await client.accountInformation(address).do();
+	const div = 100 		 // divide by this for 2 decimal place precision 
     for (let i = 0; i < accountInfoResponse['created-apps'].length; i++) { 
         if (accountInfoResponse['created-apps'][i].id == index) {
 			const app = accountInfoResponse['created-apps'][i]
-			console.log(app)
 			const rawState = app['params']['global-state'].reduce((acc, {key, value}) => {
 				const decodedKey = decodeBase64(key)
 				const decodedValue = (decodedKey=="Name") ? decodeValue(value) : value
 				acc[decodedKey] = decodedValue; 
 				return acc;
 			}, {})
-			console.log(rawState);
 			const formattedState : QVoteState = {
 				options: Object.entries(rawState).filter(([key, value]) => key.startsWith(OPTION_SYM))
 												 //@ts-ignore
-												 .map(([key, value]) => ({title: key, value: value.uint - 2**32})),
+												 .map(([key, value]) => ({title: key, value: (value.uint - 2**32) / div})),
 
 				decisionName: rawState.Name.bytes,
 				votingStartTime: rawState.voting_start_time.uint, 
 				votingEndTime: rawState.voting_end_time.uint, 
 				assetID: rawState.asset_id.uint,
-				assetCoefficient: rawState.asset_coefficient.uint,
+				assetCoefficient: rawState.asset_coefficient.uint,   
 			}
 
-			// TODO check that formattedState is of the right type at runtime 
 			return formattedState;
 		}
     }
@@ -69,7 +61,6 @@ export async function readLocalStorage(client, userAddress, appID){
 	let accountInfoResponse = await client.accountInformation(userAddress).do();
     for (let i = 0; i < accountInfoResponse['apps-local-state'].length; i++) { 
         if (accountInfoResponse['apps-local-state'][i].id == appID) {
-            console.log("User's local state:");
 			const state = accountInfoResponse['apps-local-state'][i][`key-value`];
 			return state.map(({key, value}) => ({key: decodeBase64(key), value})); 	
 		}
@@ -81,7 +72,6 @@ export async function readLocalStorage(client, userAddress, appID){
  * returns a function that takes an appID parameter, and when executed returns a tx that adds the options passed
  */
 export function buildAddOptionTxFunc(creatorAddress: string, params: any, options : string[]){
-	// const params = await this.client.getTransactionParams().do();
 	const appArgs = [ADD_OPTION_SYM].concat(options).map(encodeString)
 	return (appID) => algosdk.makeApplicationNoOpTxn(creatorAddress, params, appID, appArgs)
 }
@@ -100,6 +90,7 @@ export const waitForConfirmation = async function (algodclient, txId) {
         await algodclient.statusAfterBlock(lastRound).do();
       }
 };
+
 
 export function encodeString(s: string) : Uint8Array {
 	return new Uint8Array(Buffer.from(s));
@@ -121,7 +112,6 @@ export function intToByteArray(num: number, size: number): Uint8Array {
 	
 	const pad = size - res.length;
 	for (let i = 0; i < pad; i++) {
-    	// res.unshift(0);
 		res.push(0);
 	}
 
@@ -133,7 +123,9 @@ export function ByteArrayToIntBROKEN(array: Uint8Array){
 }
 
 export function pad(options: string[]) : string[] {
-	// assert(options.length <= 5)
+	if (options.length > 5){
+		throw "You passed more than 5 options at the same time to be padded. You can't do that. "
+	}
 	for (var i=0; options.length < 5; i++) {
 		options.push(NULL_OPTION_SYM); 
 	}
