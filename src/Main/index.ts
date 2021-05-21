@@ -1,0 +1,1 @@
+export { QVoting } from './QVoteAglorand';
