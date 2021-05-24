@@ -7,10 +7,8 @@
 // 	'X-API-Key': process.env.PURESTAKE_ALGORAND_API
 // }
 // const creatorMnemonic = "leopard wrestle history fog scare twist churn bullet action poet enter ketchup gasp media bonus joke anger month defy degree grit witness strategy able income"
-
 // const creatorAccount = algosdk.mnemonicToSecretKey(creatorMnemonic);
 // const userMnemonic = "menu circle frozen typical radio cry various shrug chef dance inmate obtain trouble absent food bicycle twice bench undo rice snow click ability abstract mystery";
-
 // const userAccount = algosdk.mnemonicToSecretKey(userMnemonic);
 
 // // NOTE ALL OF THIS HAS TO BE UPDATED 

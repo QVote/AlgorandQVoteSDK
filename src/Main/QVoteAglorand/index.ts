@@ -3,34 +3,15 @@ import {intToByteArray, readLocalStorage,
 		readGlobalState, buildAddOptionTxFunc, 
 		groupOptions, loadCompiledPrograms, encodeNumber, 
 		encodeString, waitForConfirmation, QVoteState} from "./utils"
+
+import {SignMethod, QVoteParams, config} from './types'
+
 //import * as assert from "assert"
 import {VOTE_SYM, ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
 
-/*
- * Parameters of the contract for QVoting.
- */
-// type QVoteParams = QVoteState & {options: string[]}      // replace options 
-export type QVoteParams = { 
-	decisionName: string,
-	votingStartTime: number, 
-	votingEndTime: number, 
-	assetID: number, 
-	assetCoefficient: number,
-	options: string[],
-	creatorAddress: string
-}
-
-interface config {
-	token: any, 
-	baseServer: any, 
-	port: any
-}			
-
-export type SignMethod = "raw" | "myalgo"; 
-
 class QVoting{
 
-	private client: any;    // this client cannot sign transactions. It is simply used to call the apis 
+	private client: any;   
 	private deployTxId: string; 
 	private appID: number; 
 	private creatorAddress: string; 
@@ -44,18 +25,17 @@ class QVoting{
 	/*
 	 * Create a new QVote object from scratch, or create one from an already deployed app by providing the appID
 	 */
-	constructor(conf: config, signMethod: SignMethod, wallet : any,  params? : QVoteParams){
+	constructor(conf: config, wallet? : any,  params? : QVoteParams){
 		const {token, baseServer, port} = conf; 
 		this.client = new algosdk.Algodv2(token, baseServer, port); // TODO take client params from config file 
 		this.indexerClient = new algosdk.Indexer(token, baseServer , port);
 
-		this.signMethod = signMethod;
-
-		// check thgat signmethod and wallet match 
+		this.signMethod = (typeof wallet != 'undefined') ? 'myalgo' : 'raw'    // NOTE right now there are only two ways of signing 
 		this.wallet = wallet;
 		
-		if (typeof params != 'undefined') {
+		if (typeof params != 'undefined') {     // deploying a new contract 
 			this.creatorAddress = params.creatorAddress; 
+			
 			this.state = {
 				...params, 
 				options: params.options.map(title => ({title, value: 0}))
@@ -100,8 +80,6 @@ class QVoting{
 		if (options.length > 5){
 			throw 'Options can be at most 5 at creation. Build other AddOption txs for the remaining ones.'
 		}
-		console.log(this.state.decisionName) 
-		console.log(options)
         const appArgs = [encodeString(this.state.decisionName)]
                             .concat(options.map(encodeString))
                             .concat([this.state.assetID, this.state.assetCoefficient,
@@ -134,6 +112,8 @@ class QVoting{
 		const globalBytes = 3;
 		
 		const appArgs = this.buildQVoteDeployArgs(groupedOptions[0])
+		console.log(appArgs)
+		console.log(typeof appArgs)
 		const appCreateTx = algosdk.makeApplicationCreateTxn(this.creatorAddress, params, onComplete, 
 												approval, clearState, 
 												localInts, localBytes, globalInts, globalBytes, 
@@ -161,6 +141,10 @@ class QVoting{
 		if (typeof this.state == 'undefined') {
 			console.log('cannot create ') 
 		}
+		if (this.signMethod == 'raw') {
+			throw "Can't deploy without wallet signing. You should probably call buildDeployTxs, then sign and send the txs yourself"
+		}
+
 		var {appCreateTx, addOptionFns} = await this.buildDeployTxs()
 
 		// Creating Application 
