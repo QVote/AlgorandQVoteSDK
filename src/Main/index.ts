@@ -1,1 +1,0 @@
-export { QVoting } from './QVoteAglorand';
