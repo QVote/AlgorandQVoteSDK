@@ -4,7 +4,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test" : "ts-node ./test/raw_signing.ts"
   },
   "repository": {
     "type": "git",
@@ -25,6 +26,7 @@
     "@typescript-eslint/eslint-plugin": "^4.25.0",
     "@typescript-eslint/parser": "^4.25.0",
     "dotenv": "^10.0.0",
-    "eslint": "^7.27.0"
+    "eslint": "^7.27.0",
+    "ts-node": "^10.0.0"
   }
 }
