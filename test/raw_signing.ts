@@ -6,15 +6,6 @@ This could be used to use a signer not already integrated in the sdk.
 import {QVoting} from '../src'
 import * as algosdk from 'algosdk'
 
-export type QVoteParams = { 
-	decisionName: string,
-	votingStartTime: number, 
-	votingEndTime: number, 
-	assetID: number, 
-	assetCoefficient: number,
-	options: string[],
-	creatorAddress: string
-}
 
 (async () => {
 

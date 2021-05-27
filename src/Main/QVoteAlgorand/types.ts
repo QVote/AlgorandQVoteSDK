@@ -16,6 +16,13 @@ export type config = {
 	token: any, 
 	baseServer: any, 
 	port: any
-}			
+} 
 
-export type SignMethod = "raw" | "myalgo"; 
+export type QVoteState = { 
+	decisionName: string,
+	votingStartTime: number, 
+	votingEndTime: number, 
+	assetID: number, 
+	assetCoefficient: number
+	options: {title: string, value: number}[]
+}

@@ -1,13 +1,11 @@
 import * as algosdk from "algosdk";
 import {intToByteArray, readLocalStorage, 
 		readGlobalState, buildAddOptionTxFunc, 
-		groupOptions, loadCompiledPrograms, encodeNumber, 
-		encodeString, waitForConfirmation, QVoteState} from "./utils"
+		groupOptions, loadCompiledPrograms,  
+		encodeString, waitForConfirmation} from "./utils"
 
-import {SignMethod, QVoteParams, config} from './types'
-
-//import * as assert from "assert"
-import {VOTE_SYM, ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
+import {QVoteState, QVoteParams, config} from './types'
+import * as symbols from "./symbols"
 
 class QVoting{
 
@@ -16,7 +14,7 @@ class QVoting{
 	private appID: number; 
 	private creatorAddress: string; 
 	private state: QVoteState; 
-	private signMethod : SignMethod;
+	private signMethod : 'myalgo' | 'raw' ;
 	private wallet : any; 
 	private indexerClient : any; 
 
@@ -233,7 +231,7 @@ class QVoting{
 					params, 
 					this.appID, 
 					[
-						encodeString(VOTE_SYM), 
+						encodeString(symbols.VOTE_SYM), 
 						encodeString(o.optionTitle), 
 						// votes are multiplied to whatever decimal places are being displayed 
 						intToByteArray(Math.round(10**this.decimalPlaces*Math.sqrt(Math.abs(o.creditNumber))), 3), 	

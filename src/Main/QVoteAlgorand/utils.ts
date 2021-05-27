@@ -1,17 +1,7 @@
 import * as algosdk from "algosdk";
 import {ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM} from "./symbols"
 import {qvApprovalProgram, qvClearProgram} from "../../ContractCode"
-
-
-export type QVoteState = { 
-	decisionName: string,
-	votingStartTime: number, 
-	votingEndTime: number, 
-	assetID: number, 
-	assetCoefficient: number
-	options: {title: string, value: number}[]
-}
-
+import {QVoteState} from './types'
 
 export function loadCompiledPrograms() : {approval: Uint8Array, clearState: Uint8Array}{
 	return {approval: qvApprovalProgram, clearState: qvClearProgram}
