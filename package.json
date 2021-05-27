@@ -5,7 +5,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test" : "ts-node ./test/raw_signing.ts"
+    "test": "ts-node ./test/raw_signing.ts"
   },
   "repository": {
     "type": "git",

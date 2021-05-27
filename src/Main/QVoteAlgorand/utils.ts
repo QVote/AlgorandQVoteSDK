@@ -26,7 +26,7 @@ export async function readGlobalState(
 ): Promise<QVoteState> {
     // NOTE decimalPlaces is a temporary hack, until the contracts handle decimal points
     const accountInfoResponse = await client.accountInformation(address).do();
-    const div = 100; // divide by this for 2 decimal place precision
+    const div = 10; // divide by this for 1 decimal place precision
     for (let i = 0; i < accountInfoResponse["created-apps"].length; i++) {
         if (accountInfoResponse["created-apps"][i].id == index) {
             const app = accountInfoResponse["created-apps"][i];

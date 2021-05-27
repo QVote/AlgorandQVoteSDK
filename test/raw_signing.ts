@@ -2,9 +2,10 @@
 In this example we will show how to use QVote without any signer. 
 This could be used to use a signer not already integrated in the sdk. 
 */
+
 require("dotenv").config();
 import { QVoting } from "../src";
-import { mnemonicToSecretKey } from "algosdk";
+import algosdk, { mnemonicToSecretKey } from "algosdk";
 
 (async () => {
     const token = { "X-API-Key": process.env.PURESTAKE_ALGORAND_API };
@@ -13,11 +14,12 @@ import { mnemonicToSecretKey } from "algosdk";
     const conf = { token: token, baseServer: baseServer, port: port };
 
     const creatorMemo =
-        "strategy nurse quantum rookie depend away payment middle horse derive bleak fashion grid response wing garbage filter stairs proud timber devote cinnamon cover about marble";
+        "outside narrow athlete skill around soccer win canoe october knife situate treat remain insect police clown clutch buyer angle page scout job impact able ecology";
     const creatorAccount = mnemonicToSecretKey(creatorMemo);
 
     const userMemo =
-        "leopard wrestle history fog scare twist churn bullet action poet enter ketchup gasp media bonus joke anger month defy degree grit witness strategy able income";
+        "universe cabbage park social now address more amazing stem old toddler climb conduct table topple engine avoid outdoor forum fetch glance blast estate abstract select";
+
     const userAccount = mnemonicToSecretKey(userMemo);
 
     const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
@@ -165,7 +167,8 @@ import { mnemonicToSecretKey } from "algosdk";
 
             console.log("signed and sent all vote txs");
 
-            // TODO why do these print outdated values? results look good on the explorer
+            // we need to wait a sec to get the updated values from the api 
+            await sleep(5 * 1000); 
             state = await qv.readGlobalState();
             state.options.map((o) => console.log(o.value.toString()));
             console.log("STATE", state);
@@ -177,6 +180,19 @@ import { mnemonicToSecretKey } from "algosdk";
             console.log(e);
         }
     }
+
+    async function logState(appID : number){
+        const qv  = new QVoting(conf)
+        await qv.initState(appID)
+
+        const globalState = await qv.readGlobalState(); 
+        console.log(globalState)
+
+        const userBalance = await qv.getUserBalance(userAccount.addr);
+        console.log("userBalance");
+        console.log(userBalance);
+    }
+
     console.log("starting deploy");
     const appID = await deployNew();
 
@@ -188,4 +204,7 @@ import { mnemonicToSecretKey } from "algosdk";
 
     console.log("starting vote");
     await vote(appID);
+
+    await logState(appID);
+
 })();
