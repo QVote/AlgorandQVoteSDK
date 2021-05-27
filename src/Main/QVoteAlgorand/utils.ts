@@ -2,6 +2,7 @@ import * as algosdk from "algosdk";
 import { ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM } from "./symbols";
 import { qvApprovalProgram, qvClearProgram } from "../../ContractCode";
 import { QVoteState } from "./types";
+import { Transaction, Algodv2 } from "algosdk";
 
 export function loadCompiledPrograms(): {
     approval: Uint8Array;
@@ -19,7 +20,7 @@ function decodeValue(v: { bytes: string; type: number; uint: number }) {
 }
 
 export async function readGlobalState(
-    client: any,
+    client: Algodv2,
     address: string,
     index: number
 ): Promise<QVoteState> {
@@ -29,16 +30,15 @@ export async function readGlobalState(
     for (let i = 0; i < accountInfoResponse["created-apps"].length; i++) {
         if (accountInfoResponse["created-apps"][i].id == index) {
             const app = accountInfoResponse["created-apps"][i];
-            const rawState = app["params"]["global-state"].reduce(
-                (acc, { key, value }) => {
-                    const decodedKey = decodeBase64(key);
-                    const decodedValue =
-                        decodedKey == "Name" ? decodeValue(value) : value;
-                    acc[decodedKey] = decodedValue;
-                    return acc;
-                },
-                {}
-            );
+            const rawState: { [key: string]: any } = app["params"][
+                "global-state"
+            ].reduce((acc, { key, value }) => {
+                const decodedKey = decodeBase64(key);
+                const decodedValue =
+                    decodedKey == "Name" ? decodeValue(value) : value;
+                acc[decodedKey] = decodedValue;
+                return acc;
+            }, {});
             const formattedState: QVoteState = {
                 options: Object.entries(rawState)
                     .filter(([key, value]) => key.startsWith(OPTION_SYM))
@@ -64,7 +64,9 @@ export async function readGlobalState(
 }
 
 export async function readLocalStorage(client, userAddress, appID) {
-    let accountInfoResponse = await client.accountInformation(userAddress).do();
+    const accountInfoResponse = await client
+        .accountInformation(userAddress)
+        .do();
     for (let i = 0; i < accountInfoResponse["apps-local-state"].length; i++) {
         if (accountInfoResponse["apps-local-state"][i].id == appID) {
             const state =
@@ -84,16 +86,16 @@ export function buildAddOptionTxFunc(
     creatorAddress: string,
     params: any,
     options: string[]
-) {
+): (a: number) => Transaction {
     const appArgs = [ADD_OPTION_SYM].concat(options).map(encodeString);
-    return (appID) =>
+    return (appID: number) =>
         algosdk.makeApplicationNoOpTxn(creatorAddress, params, appID, appArgs);
 }
 
-export const waitForConfirmation = async function (algodclient, txId) {
-    let status = await algodclient.status().do();
+export const waitForConfirmation = async (algodclient, txId) => {
+    const status = await algodclient.status().do();
     let lastRound = status["last-round"];
-    while (true) {
+    for (let x = 0; x < 999; x++) {
         const pendingInfo = await algodclient
             .pendingTransactionInformation(txId)
             .do();
@@ -101,7 +103,7 @@ export const waitForConfirmation = async function (algodclient, txId) {
             pendingInfo["confirmed-round"] !== null &&
             pendingInfo["confirmed-round"] > 0
         ) {
-            //Got the completed Transaction
+            //Got the completed Transaction∑
             console.log(
                 "Transaction " +
                     txId +
@@ -119,7 +121,7 @@ export function encodeString(s: string): Uint8Array {
     return new Uint8Array(Buffer.from(s));
 }
 
-export function encodeNumber(n: number) {
+export function encodeNumber(n: number): Uint8Array {
     return new Uint8Array([n]);
 }
 
@@ -141,7 +143,7 @@ export function intToByteArray(num: number, size: number): Uint8Array {
     return Uint8Array.from(res.reverse());
 }
 
-export function ByteArrayToIntBROKEN(array: Uint8Array) {
+export function ByteArrayToIntBROKEN(array: Uint8Array): number {
     return Buffer.from(array).readUIntBE(0, 6);
 }
 
@@ -149,14 +151,14 @@ export function pad(options: string[]): string[] {
     if (options.length > 5) {
         throw "You passed more than 5 options at the same time to be padded. You can't do that. ";
     }
-    for (var i = 0; options.length < 5; i++) {
+    for (let i = 0; options.length < 5; i++) {
         options.push(NULL_OPTION_SYM);
     }
     return options;
 }
 
 export function groupOptions(options: string[]): string[][] {
-    var out = [];
+    const out = [];
     options.map((d, i) => {
         i % 5 == 0 && out.push([]);
         out[out.length - 1].push(d);

@@ -1,3 +1,7 @@
+import type { Transaction } from "algosdk";
+
+export type Address = Transaction["from"];
+
 /*
  * Parameters of the contract for QVoting.
  */
@@ -12,9 +16,11 @@ export type QVoteParams = {
 };
 
 export type config = {
-    token: any;
-    baseServer: any;
-    port: any;
+    token: {
+        "X-API-Key": string;
+    };
+    baseServer: string;
+    port: string | number;
 };
 
 export type QVoteState = {

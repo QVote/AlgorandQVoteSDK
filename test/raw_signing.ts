@@ -4,7 +4,7 @@ This could be used to use a signer not already integrated in the sdk.
 */
 
 import { QVoting } from "../src";
-import * as algosdk from "algosdk";
+import { mnemonicToSecretKey } from "algosdk";
 
 (async () => {
     const token = { "X-API-Key": process.env.PURESTAKE_ALGORAND_API };
@@ -14,13 +14,13 @@ import * as algosdk from "algosdk";
 
     const creatorMemo =
         "strategy nurse quantum rookie depend away payment middle horse derive bleak fashion grid response wing garbage filter stairs proud timber devote cinnamon cover about marble";
-    const creatorAccount = algosdk.mnemonicToSecretKey(creatorMemo);
+    const creatorAccount = mnemonicToSecretKey(creatorMemo);
 
     const userMemo =
         "leopard wrestle history fog scare twist churn bullet action poet enter ketchup gasp media bonus joke anger month defy degree grit witness strategy able income";
-    const userAccount = algosdk.mnemonicToSecretKey(userMemo);
+    const userAccount = mnemonicToSecretKey(userMemo);
 
-    const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+    const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
     async function deployNew() {
         try {
@@ -64,7 +64,7 @@ import * as algosdk from "algosdk";
             // sign and send the appCreate tx
             const txId = appCreateTx.txID().toString();
             console.log("txID", txId);
-            let signedTxn = appCreateTx.signTxn(creatorAccount.sk);
+            const signedTxn = appCreateTx.signTxn(creatorAccount.sk);
             console.log("Signed transaction with txID: %s", txId);
             await qv.sendSignedTx(signedTxn);
             console.log("SENT");
@@ -137,10 +137,10 @@ import * as algosdk from "algosdk";
             await qv.initState(appID);
 
             // reading out the inital state to compare
-            var state = await qv.readGlobalState();
+            let state = await qv.readGlobalState();
             console.log("STATE", state);
 
-            var userBalance = await qv.getUserBalance(userAccount.addr);
+            let userBalance = await qv.getUserBalance(userAccount.addr);
             console.log("userBalance");
             console.log(userBalance);
 
@@ -184,7 +184,7 @@ import * as algosdk from "algosdk";
     await optIn(appID);
 
     console.log("waiting 40 seconds");
-    await delay(40 * 1000);
+    await sleep(40 * 1000);
 
     console.log("starting vote");
     await vote(appID);

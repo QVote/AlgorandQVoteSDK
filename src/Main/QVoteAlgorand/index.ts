@@ -1,4 +1,13 @@
-import * as algosdk from "algosdk";
+import {
+    Algodv2,
+    Indexer,
+    OnApplicationComplete,
+    makeApplicationCreateTxn,
+    makeApplicationOptInTxn,
+    makeApplicationNoOpTxn,
+    Transaction,
+    decodeAddress,
+} from "algosdk";
 import {
     intToByteArray,
     readLocalStorage,
@@ -10,18 +19,18 @@ import {
     waitForConfirmation,
 } from "./utils";
 
-import { QVoteState, QVoteParams, config } from "./types";
+import { QVoteState, QVoteParams, config, Address } from "./types";
 import * as symbols from "./symbols";
 
 class QVoting {
-    private client: any;
+    private client: Algodv2;
     private deployTxId: string;
     private appID: number;
     private creatorAddress: string;
-    private state: QVoteState;
+    state: QVoteState;
     private signMethod: "myalgo" | "raw";
     private wallet: any;
-    private indexerClient: any;
+    private indexerClient: Indexer;
 
     private decimalPlaces = 1;
 
@@ -30,8 +39,8 @@ class QVoting {
      */
     constructor(conf: config, wallet?: any, params?: QVoteParams) {
         const { token, baseServer, port } = conf;
-        this.client = new algosdk.Algodv2(token, baseServer, port); // TODO take client params from config file
-        this.indexerClient = new algosdk.Indexer(token, baseServer, port);
+        this.client = new Algodv2(token, baseServer, port); // TODO take client params from config file
+        this.indexerClient = new Indexer(token, baseServer, port);
 
         this.signMethod = typeof wallet != "undefined" ? "myalgo" : "raw"; // NOTE right now there are only two ways of signing
         this.wallet = wallet;
@@ -52,7 +61,7 @@ class QVoting {
      * Pass either the appID of newly deployed transactions from the parameters,
      * or the appID of an existing qvote decision on the blockchain.
      */
-    async initState(appID: number) {
+    async initState(appID: number): Promise<void> {
         this.appID = appID;
         // TODO fill the state form the app data, don't make another call
         const appData = await this.indexerClient.lookupApplications(appID).do();
@@ -62,18 +71,6 @@ class QVoting {
         if (typeof this.state == "undefined") {
             this.state = await this.readGlobalState();
         }
-    }
-
-    getName(): string {
-        return this.state.decisionName;
-    }
-
-    getOptionTitles(): string[] {
-        return this.state.options.map((o) => o.title);
-    }
-
-    getResults(): { title: string; value: number }[] {
-        return this.state.options;
     }
 
     /*
@@ -97,28 +94,26 @@ class QVoting {
         return appArgs;
     }
 
+    getOptionTitles(): string[] {
+        return this.state.options.map((o) => o.title);
+    }
+
     /*
      * Returns an unsigned transaction for deploying a QVote decision
      */
-    async buildDeployTxs() {
-        const {
-            decisionName,
-            votingStartTime,
-            votingEndTime,
-            assetID,
-            assetCoefficient,
-            options,
-        } = this.state;
+    async buildDeployTxs(): Promise<{
+        appCreateTx: Transaction;
+        addOptionFns: ((appID: number) => Transaction)[];
+    }> {
+        const { options } = this.state;
         if (options.length >= 57) {
             throw "too many options, limit is 57"; // TODO check this
         }
 
-        var txs = [];
-
         // Application Creation tx
         const groupedOptions = groupOptions(this.getOptionTitles());
         const { approval, clearState } = loadCompiledPrograms();
-        const onComplete = algosdk.OnApplicationComplete.NoOpOC;
+        const onComplete = OnApplicationComplete.NoOpOC;
         const params = await this.client.getTransactionParams().do();
 
         const localInts = 1;
@@ -129,7 +124,7 @@ class QVoting {
         const appArgs = this.buildQVoteDeployArgs(groupedOptions[0]);
         console.log(appArgs);
         console.log(typeof appArgs);
-        const appCreateTx = algosdk.makeApplicationCreateTxn(
+        const appCreateTx = makeApplicationCreateTxn(
             this.creatorAddress,
             params,
             onComplete,
@@ -150,33 +145,32 @@ class QVoting {
         return { appCreateTx: appCreateTx, addOptionFns: addOptionFns };
     }
 
-    async myAlgoPreprocessAddOptionTxs(txs) {
-        const txParams = await this.client.getTransactionParams().do();
-        return txs
-            .map((tx) => {
-                tx["from"] = this.creatorAddress;
-                return tx;
-            })
-            .map((tx) => {
-                tx["genesisHash"] = txParams["genesisHash"];
-                return tx;
-            });
+    private async myAlgoPreprocessAddOptionTxs(
+        txs: Transaction[]
+    ): Promise<Transaction[]> {
+        return this.processTx(txs, decodeAddress(this.creatorAddress));
     }
 
-    async myAlgoPreprocessVoteTxs(txs, userAddress: string) {
-        const txParams = await this.client.getTransactionParams().do();
-        return txs
-            .map((tx) => {
-                tx["from"] = userAddress;
-                return tx;
-            })
-            .map((tx) => {
-                tx["genesisHash"] = txParams["genesisHash"];
-                return tx;
-            });
+    private async myAlgoPreprocessVoteTxs(
+        txs: Transaction[],
+        userAddress: string
+    ): Promise<Transaction[]> {
+        return this.processTx(txs, decodeAddress(userAddress));
     }
 
-    async deployNew() {
+    private async processTx(
+        txs: Transaction[],
+        from: Address
+    ): Promise<Transaction[]> {
+        const txParams = await this.client.getTransactionParams().do();
+        return txs.map((tx) => {
+            tx["from"] = from;
+            tx["genesisHash"] = Buffer.from(txParams["genesisHash"]);
+            return tx;
+        });
+    }
+
+    async deployNew(): Promise<void> {
         if (typeof this.state == "undefined") {
             console.log("cannot create ");
         }
@@ -184,11 +178,11 @@ class QVoting {
             throw "Can't deploy without wallet signing. You should probably call buildDeployTxs, then sign and send the txs yourself";
         }
 
-        var { appCreateTx, addOptionFns } = await this.buildDeployTxs();
+        const { appCreateTx, addOptionFns } = await this.buildDeployTxs();
 
         // Creating Application
         console.log("deploying app");
-        appCreateTx["from"] = this.creatorAddress;
+        appCreateTx["from"] = decodeAddress(this.creatorAddress);
         delete appCreateTx["appIndex"]; // apparently it thinks this is an app call otherwise
 
         console.log(appCreateTx);
@@ -213,9 +207,6 @@ class QVoting {
             const addOptionTxs = await this.myAlgoPreprocessAddOptionTxs(
                 addOptionFns.map((f) => f(this.appID))
             );
-            // .map(tx => this.replaceFromWithBase64String(tx, this.creatorAddress))
-            // .map(tx => {tx['genesisHash'] = txParams['genesisHash']; return tx})
-
             console.log("good", addOptionTxs);
 
             // if length is 1 don't use map later down.
@@ -235,27 +226,19 @@ class QVoting {
         console.log("done");
     }
 
-    getDeployTxId() {
-        return this.deployTxId;
-    }
-
-    async buildOptInTx(userAddress: string) {
+    async buildOptInTx(userAddress: string): Promise<Transaction> {
         const params = await this.client.getTransactionParams().do();
-        const txn = algosdk.makeApplicationOptInTxn(
-            userAddress,
-            params,
-            this.appID
-        );
+        const txn = makeApplicationOptInTxn(userAddress, params, this.appID);
         return txn;
     }
 
-    async optIn(userAddress: string) {
-        var tx = await this.buildOptInTx(userAddress);
+    async optIn(userAddress: string): Promise<void> {
+        const tx = await this.buildOptInTx(userAddress);
         console.log(tx);
 
         const txParams = await this.client.getTransactionParams().do();
-        tx["from"] = userAddress;
-        tx["genesisHash"] = txParams["genesisHash"];
+        tx["from"] = decodeAddress(userAddress);
+        tx["genesisHash"] = Buffer.from(txParams["genesisHash"]);
         tx["appArgs"] = [];
         delete tx["tag"];
         delete tx["lease"];
@@ -277,11 +260,10 @@ class QVoting {
     async buildVoteTxs(
         userAddress: string,
         options: { optionTitle: string; creditNumber: number }[]
-    ) {
+    ): Promise<Transaction[]> {
         const params = await this.client.getTransactionParams().do();
-        var o = options[0];
         return options.map((o) =>
-            algosdk.makeApplicationNoOpTxn(userAddress, params, this.appID, [
+            makeApplicationNoOpTxn(userAddress, params, this.appID, [
                 encodeString(symbols.VOTE_SYM),
                 encodeString(o.optionTitle),
                 // votes are multiplied to whatever decimal places are being displayed
@@ -300,9 +282,11 @@ class QVoting {
     async vote(
         userAddress: string,
         options: { optionTitle: string; creditNumber: number }[]
-    ) {
-        var txs = await this.buildVoteTxs(userAddress, options);
-        txs = await this.myAlgoPreprocessVoteTxs(txs, userAddress);
+    ): Promise<void> {
+        const txs = await this.myAlgoPreprocessVoteTxs(
+            await this.buildVoteTxs(userAddress, options),
+            userAddress
+        );
 
         const signedTxs = await this.wallet.signTransaction(txs);
         const addOptiontxIDs = signedTxs.map((tx) => tx.txID);
@@ -315,7 +299,9 @@ class QVoting {
         console.log("voted");
     }
 
-    async getUserBalance(userAddress: string) {
+    async getUserBalance(userAddress: string): Promise<{
+        [x: number]: any;
+    }> {
         const storage = await readLocalStorage(
             this.client,
             userAddress,
@@ -331,15 +317,15 @@ class QVoting {
         }
     }
 
-    async sendSignedTx(tx) {
+    async sendSignedTx(tx: Uint8Array | Uint8Array[]): Promise<void> {
         await this.client.sendRawTransaction(tx).do();
     }
 
-    async waitForConfirmation(txId) {
+    async waitForConfirmation(txId): Promise<void> {
         await waitForConfirmation(this.client, txId);
     }
 
-    async getAppId() {
+    async getAppId(): Promise<number> {
         if (typeof this.appID != "undefined") {
             return this.appID;
         }
@@ -355,7 +341,7 @@ class QVoting {
         }
     }
 
-    async readGlobalState() {
+    async readGlobalState(): Promise<QVoteState> {
         return await readGlobalState(
             this.client,
             this.creatorAddress,
