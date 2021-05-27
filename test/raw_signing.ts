@@ -2,7 +2,7 @@
 In this example we will show how to use QVote without any signer. 
 This could be used to use a signer not already integrated in the sdk. 
 */
-
+require("dotenv").config();
 import { QVoting } from "../src";
 import { mnemonicToSecretKey } from "algosdk";
 
