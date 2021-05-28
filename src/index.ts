@@ -1,1 +1,1 @@
-export { QVoting } from "./Main/QVoteAlgorand";
+export { QVoting } from "./Main/QVote";
