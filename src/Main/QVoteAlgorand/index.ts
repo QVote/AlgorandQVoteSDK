@@ -21,6 +21,7 @@ import {
 
 import { QVoteState, QVoteParams, config, Address } from "./types";
 import * as symbols from "./symbols";
+import { read } from "fs";
 
 class QVoting {
     private client: Algodv2;
@@ -65,7 +66,6 @@ class QVoting {
         this.appID = appID;
         // TODO fill the state form the app data, don't make another call
         const appData = await this.indexerClient.lookupApplications(appID).do();
-        console.log(appData);
 
         this.creatorAddress = appData.params.creator;
         if (typeof this.state == "undefined") {
@@ -342,11 +342,12 @@ class QVoting {
     }
 
     async readGlobalState(): Promise<QVoteState> {
-        return await readGlobalState(
+        this.state = await readGlobalState(
             this.client,
             this.creatorAddress,
             this.appID
         );
+        return this.state; 
     }
 }
 

@@ -167,21 +167,23 @@ import algosdk, { mnemonicToSecretKey } from "algosdk";
 
             console.log("signed and sent all vote txs");
 
-            // we need to wait a sec to get the updated values from the api 
-            await sleep(5 * 1000); 
+            await sleep(20 * 1000)  // indicatively, we have to wait a bit for the algo api to update the results 
+
             state = await qv.readGlobalState();
             state.options.map((o) => console.log(o.value.toString()));
             console.log("STATE", state);
-
+            
             userBalance = await qv.getUserBalance(userAccount.addr);
             console.log("userBalance");
             console.log(userBalance);
+
         } catch (e) {
             console.log(e);
         }
     }
 
     async function logState(appID : number){
+        console.log('LOGGING STATE')
         const qv  = new QVoting(conf)
         await qv.initState(appID)
 
