@@ -57,10 +57,10 @@ class QVoting {
         }
     }
 
-    /*
-     * Call this after creating the object to get it's state from the blockchain.
-     * Pass either the appID of newly deployed transactions from the parameters,
-     * or the appID of an existing qvote decision on the blockchain.
+    /**
+     * Call this after creating the object to get it's state from the blockchain
+     * or after deploying the app create transactions
+     * @param appID of a previously deployer qvote decision
      */
     async initState(appID: number): Promise<void> {
         this.appID = appID;
@@ -73,10 +73,11 @@ class QVoting {
         }
     }
 
-    /*
-     * takes one grouped option entry and returns arguments to be passed to build the tx
+    /**
+     * @param options list of options to be voted upon in the decision
+     * @returns application call arguments to build the deploy transactions
      */
-    buildQVoteDeployArgs(options: string[]): Uint8Array[] {
+    private buildQVoteDeployArgs(options: string[]): Uint8Array[] {
         // assert(options.length <= 5)
         if (options.length > 5) {
             throw "Options can be at most 5 at creation. Build other AddOption txs for the remaining ones.";
@@ -94,12 +95,17 @@ class QVoting {
         return appArgs;
     }
 
+    /**
+     * 
+     * @returns list of options to vote upon in the decision
+     */
     getOptionTitles(): string[] {
         return this.state.options.map((o) => o.title);
     }
 
-    /*
-     * Returns an unsigned transaction for deploying a QVote decision
+    /**
+     * 
+     * @returns unsigned deploy transactions, both appCreate and addOption tx generators
      */
     async buildDeployTxs(): Promise<{
         appCreateTx: Transaction;
@@ -145,20 +151,37 @@ class QVoting {
         return { appCreateTx: appCreateTx, addOptionFns: addOptionFns };
     }
 
+    /**
+     * 
+     * @param txs addOption transactions that will be signed with myalgo
+     * @returns modified version of txs, compatible with myalgo
+     */
     private async myAlgoPreprocessAddOptionTxs(
         txs: Transaction[]
     ): Promise<Transaction[]> {
-        return this.processTx(txs, decodeAddress(this.creatorAddress));
+        return this.updateFromAndGenesisHash(txs, decodeAddress(this.creatorAddress));
     }
 
+    /**
+     * 
+     * @param txs vote txs that will be signed using myalgo
+     * @param userAddress address of the voter (and signer)
+     * @returns modified version of txs compatible with myalgo 
+     */
     private async myAlgoPreprocessVoteTxs(
         txs: Transaction[],
         userAddress: string
     ): Promise<Transaction[]> {
-        return this.processTx(txs, decodeAddress(userAddress));
+        return this.updateFromAndGenesisHash(txs, decodeAddress(userAddress));
     }
 
-    private async processTx(
+    /**
+     * changes 'from' and 'genesisHash' fields for compatibility with web  
+     * @param txs 
+     * @param from address of the sender as a string
+     * @returns modified txs 
+     */
+    private async updateFromAndGenesisHash(
         txs: Transaction[],
         from: Address
     ): Promise<Transaction[]> {
@@ -170,6 +193,11 @@ class QVoting {
         });
     }
 
+
+    /**
+     * deploys a new qvote contract, handles the whole thing for you. 
+     * Must be using a signer. 
+     */
     async deployNew(): Promise<void> {
         if (typeof this.state == "undefined") {
             console.log("cannot create ");
@@ -226,12 +254,22 @@ class QVoting {
         console.log("done");
     }
 
+    /**
+     * 
+     * @param userAddress user to be opted in
+     * @returns unsigned opt in transactions 
+     */
     async buildOptInTx(userAddress: string): Promise<Transaction> {
         const params = await this.client.getTransactionParams().do();
         const txn = makeApplicationOptInTxn(userAddress, params, this.appID);
         return txn;
     }
 
+    /**
+     * opts in (or is it optins?) a user. Handles the whole thing for you
+     * Must be using a signer. 
+     * @param userAddress user that wants to optin
+     */
     async optIn(userAddress: string): Promise<void> {
         const tx = await this.buildOptInTx(userAddress);
         console.log(tx);
@@ -257,6 +295,12 @@ class QVoting {
         await this.waitForConfirmation(txID);
     }
 
+    /**
+     * 
+     * @param userAddress address of the user voting (that will sign the transaction)
+     * @param options option names and corresponding credits spent 
+     * @returns a list of unsigned transactions to vote for the corresponding options the appropriate amounts
+     */
     async buildVoteTxs(
         userAddress: string,
         options: { optionTitle: string; creditNumber: number }[]
@@ -279,6 +323,12 @@ class QVoting {
         );
     }
 
+    /**
+     * Votes on behalf of this user for given options. Handles everything for you
+     * Has to be called with a signer. 
+     * @param userAddress address of user that will vote
+     * @param options options and corresponding credits spent on them
+     */
     async vote(
         userAddress: string,
         options: { optionTitle: string; creditNumber: number }[]
@@ -299,6 +349,11 @@ class QVoting {
         console.log("voted");
     }
 
+    /**
+     * 
+     * @param userAddress address for which we want to know the balance
+     * @returns object mapping qvote credits symbol to the corresponding balance 
+     */
     async getUserBalance(userAddress: string): Promise<{
         [x: number]: any;
     }> {
@@ -317,14 +372,26 @@ class QVoting {
         }
     }
 
+    /**
+     * Deploys an already signed transaction
+     * @param tx signed tx to be sent 
+     */
     async sendSignedTx(tx: Uint8Array | Uint8Array[]): Promise<void> {
         await this.client.sendRawTransaction(tx).do();
     }
 
+    /**
+     * resolves when the transaction has been confirmed  
+     * @param txId id of waiting transaction
+     */
     async waitForConfirmation(txId): Promise<void> {
         await waitForConfirmation(this.client, txId);
     }
 
+    /**
+     * 
+     * @returns appID for this QVote decision
+     */
     async getAppId(): Promise<number> {
         if (typeof this.appID != "undefined") {
             return this.appID;
@@ -341,6 +408,10 @@ class QVoting {
         }
     }
 
+    /**
+     * 
+     * @returns global state of the corresponding decision contract for the instance
+     */
     async readGlobalState(): Promise<QVoteState> {
         this.state = await readGlobalState(
             this.client,
