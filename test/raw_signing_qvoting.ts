@@ -5,7 +5,7 @@ This could be used to use a signer not already integrated in the sdk.
 
 require("dotenv").config();
 import { QVoting } from "../src";
-import algosdk, { mnemonicToSecretKey } from "algosdk";
+import { mnemonicToSecretKey } from "algosdk";
 
 (async () => {
     const token = { "X-API-Key": process.env.PURESTAKE_ALGORAND_API };
@@ -71,7 +71,7 @@ import algosdk, { mnemonicToSecretKey } from "algosdk";
             await qv.sendSignedTx(signedTxn);
             console.log("SENT");
             await qv.waitForConfirmation(txId);
-            const appID = await qv.getAppId();
+            const appID = await qv.getAppID();
             console.log("deployed new contract with appID", appID);
 
             // Now that we have the appID we can evaluate the addOption functions
@@ -208,5 +208,4 @@ import algosdk, { mnemonicToSecretKey } from "algosdk";
     await vote(appID);
 
     await logState(appID);
-
 })();

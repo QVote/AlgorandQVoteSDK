@@ -1,25 +1,36 @@
 import * as algosdk from "algosdk";
-import { ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM } from "./symbols";
-import { qvApprovalProgram, qvClearProgram } from "../../ContractCode";
+import { ADD_OPTION_SYM, OPTION_SYM, NULL_OPTION_SYM } from "./QVote/symbols";
+import { qvApprovalProgram, qvClearProgram, queueApprovalProgram, queueClearProgram } from "../ContractCode";
 import { QVoteState } from "./types";
-import { Transaction, Algodv2 } from "algosdk";
+import { Transaction, Algodv2, Indexer } from "algosdk";
 
-export function loadCompiledPrograms(): {
+// TODO shared wallet connect
+// TODO shared client and indexer
+
+export function loadCompiledQVotePrograms(): {
     approval: Uint8Array;
     clearState: Uint8Array;
 } {
     return { approval: qvApprovalProgram, clearState: qvClearProgram };
 }
 
-function decodeBase64(s: string) {
+export function loadCompiledQueuePrograms(): {
+    approval: Uint8Array;
+    clearState: Uint8Array;
+} {
+    return { approval: queueApprovalProgram, clearState: queueClearProgram };
+}
+
+export function decodeBase64(s: string) {
     return Buffer.from(s, "base64").toString();
 }
 
-function decodeValue(v: { bytes: string; type: number; uint: number }) {
+export function decodeValue(v: { bytes: string; type: number; uint: number }) {
     return { ...v, bytes: Buffer.from(v.bytes, "base64").toString() };
 }
 
-export async function readGlobalState(
+// TODO split this in two methods, generic readGlobalState in utils, and processState in QVote 
+export async function readGlobalQVoteState(
     client: Algodv2,
     address: string,
     index: number
@@ -61,6 +72,11 @@ export async function readGlobalState(
     console.log(
         "QVote decision not found. Is the creator correct? Has the decision been deployed?"
     );
+}
+
+export async function readGlobalQueueState(indexer: Indexer, appID: number){
+    const appData = await indexer.lookupApplications(appID).do();
+    return appData;
 }
 
 export async function readLocalStorage(client, userAddress, appID) {
@@ -125,7 +141,6 @@ export function encodeNumber(n: number): Uint8Array {
     return new Uint8Array([n]);
 }
 
-// TODO make this work both little and big endian
 export function intToByteArray(num: number, size: number): Uint8Array {
     let x = num;
     const res: number[] = [];
@@ -141,10 +156,6 @@ export function intToByteArray(num: number, size: number): Uint8Array {
     }
 
     return Uint8Array.from(res.reverse());
-}
-
-export function ByteArrayToIntBROKEN(array: Uint8Array): number {
-    return Buffer.from(array).readUIntBE(0, 6);
 }
 
 export function pad(options: string[]): string[] {

@@ -5,7 +5,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "ts-node ./test/raw_signing.ts"
+    "test_qvoting": "ts-node ./test/raw_signing_qvoting.ts",
+    "test_queue": "ts-node ./test/raw_signing_queue.ts"
   },
   "repository": {
     "type": "git",

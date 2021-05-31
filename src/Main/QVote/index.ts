@@ -11,21 +11,20 @@ import {
 import {
     intToByteArray,
     readLocalStorage,
-    readGlobalState,
+    readGlobalQVoteState,
     buildAddOptionTxFunc,
     groupOptions,
-    loadCompiledPrograms,
+    loadCompiledQVotePrograms,
     encodeString,
     waitForConfirmation,
-} from "./utils";
+} from "../utils";
 
-import { QVoteState, QVoteParams, config, Address } from "./types";
+import { QVoteState, QVoteParams, config, Address } from "../types";
 import * as symbols from "./symbols";
-import { read } from "fs";
 
 class QVoting {
     private client: Algodv2;
-    private deployTxId: string;
+    private deployTxID: string;
     private appID: number;
     private creatorAddress: string;
     state: QVoteState;
@@ -78,7 +77,6 @@ class QVoting {
      * @returns application call arguments to build the deploy transactions
      */
     private buildQVoteDeployArgs(options: string[]): Uint8Array[] {
-        // assert(options.length <= 5)
         if (options.length > 5) {
             throw "Options can be at most 5 at creation. Build other AddOption txs for the remaining ones.";
         }
@@ -118,7 +116,7 @@ class QVoting {
 
         // Application Creation tx
         const groupedOptions = groupOptions(this.getOptionTitles());
-        const { approval, clearState } = loadCompiledPrograms();
+        const { approval, clearState } = loadCompiledQVotePrograms();
         const onComplete = OnApplicationComplete.NoOpOC;
         const params = await this.client.getTransactionParams().do();
 
@@ -128,8 +126,6 @@ class QVoting {
         const globalBytes = 3;
 
         const appArgs = this.buildQVoteDeployArgs(groupedOptions[0]);
-        console.log(appArgs);
-        console.log(typeof appArgs);
         const appCreateTx = makeApplicationCreateTxn(
             this.creatorAddress,
             params,
@@ -142,7 +138,9 @@ class QVoting {
             globalBytes,
             appArgs
         );
-        this.deployTxId = appCreateTx.txID().toString(); // this is valid only if signing using algosdk, otherwise it will be overridden
+
+        // this is valid only if signing using raw signing method, otherwise it will be overridden
+        this.deployTxID = appCreateTx.txID().toString(); 
 
         // Add option tx generator functions
         const addOptionFns = groupedOptions
@@ -215,18 +213,18 @@ class QVoting {
 
         console.log(appCreateTx);
         const signedTxn = await this.wallet.signTransaction(appCreateTx);
-        this.deployTxId = signedTxn.txID; // overriding with the new txId
+        this.deployTxID = signedTxn.txID; // overriding with the new txId
 
         console.log(signedTxn);
-        console.log("Signed transaction with txID: %s", this.deployTxId);
+        console.log("Signed transaction with txID: %s", this.deployTxID);
 
         await this.sendSignedTx(signedTxn.blob);
         console.log("SENT");
 
-        await this.waitForConfirmation(this.deployTxId);
+        await this.waitForConfirmation(this.deployTxID);
         console.log("confirmed");
 
-        this.appID = await this.getAppId();
+        this.appID = await this.getAppID();
 
         // Adding Options
         if (addOptionFns.length > 0) {
@@ -287,7 +285,7 @@ class QVoting {
         const txID = signedTxn.txID;
 
         console.log(signedTxn);
-        console.log("Signed transaction with txID: %s", this.deployTxId);
+        console.log("Signed transaction with txID: %s", this.deployTxID);
 
         await this.sendSignedTx(signedTxn.blob);
         console.log("SENT");
@@ -372,6 +370,7 @@ class QVoting {
         }
     }
 
+    // TODO this should be in the signer, using shared client 
     /**
      * Deploys an already signed transaction
      * @param tx signed tx to be sent 
@@ -392,14 +391,14 @@ class QVoting {
      * 
      * @returns appID for this QVote decision
      */
-    async getAppId(): Promise<number> {
+    async getAppID(): Promise<number> {
         if (typeof this.appID != "undefined") {
             return this.appID;
         }
         // instance has been created from scratch. checking if the app has been deployed
-        if (typeof this.deployTxId != "undefined") {
+        if (typeof this.deployTxID != "undefined") {
             const transactionResponse = await this.client
-                .pendingTransactionInformation(this.deployTxId)
+                .pendingTransactionInformation(this.deployTxID)
                 .do();
             this.appID = transactionResponse["application-index"];
             return this.appID;
@@ -413,7 +412,7 @@ class QVoting {
      * @returns global state of the corresponding decision contract for the instance
      */
     async readGlobalState(): Promise<QVoteState> {
-        this.state = await readGlobalState(
+        this.state = await readGlobalQVoteState(
             this.client,
             this.creatorAddress,
             this.appID
