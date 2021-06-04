@@ -23,6 +23,7 @@ import {
 import {
     config,
 } from '../types'
+import { sign } from "crypto";
 
 
 class QQueue {
@@ -48,7 +49,8 @@ class QQueue {
 
     private constructor(conf: config, wallet?: any, appID?: number, size?: number, creatorAddress?: string){ 
 
-        // TODO client and indexer should be shared in the util 
+        // TODO client and indexer should be shared in the util, 
+        // and we could pass a referecnce to the helper object to both the 
         const { token, baseServer, port } = conf;
         this.client = new Algodv2(token, baseServer, port); 
         this.indexerClient = new Indexer(token, baseServer, port);
@@ -158,6 +160,7 @@ class QQueue {
         return tx;
     }
 
+    // TODO 
     async getDecisions() : Promise<string[]>{
         return ;
     }
@@ -183,8 +186,26 @@ class QQueue {
         return tx;
     }
 
-    async push(decisionAppID: number) {}
-    async getLatestDecision() {}
+    // async deployNew(creatorAddress: string){
+
+    // }
+
+    // TODO wallet methods 
+    async push(userAddress: string, decisionAppID: number) : Promise<void> {
+        // make sure instance is initialized
+        if (typeof this.appID == 'undefined'){
+            throw "instance is not initialized"
+        }
+        const txParams = await this.client.getTransactionParams().do();
+
+        var pushTx = this.buildPushTx(userAddress, decisionAppID)
+        pushTx['from'] = userAddress;
+        pushTx['genesisHash'] = txParams['genesisHash']
+        const signedTx = await this.wallet.signTransaction(pushTx);
+        const txID = signedTx.txID;
+        await this.sendSignedTx(signedTx.blob);
+        await this.waitForConfirmation(txID);
+    }
 
     // TODO like all other methods that simply use a client, this should go in utils once utils has it's own client 
     async sendSignedTx(tx: Uint8Array | Uint8Array[]): Promise<void> {

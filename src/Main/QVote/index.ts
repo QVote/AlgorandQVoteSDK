@@ -279,17 +279,11 @@ class QVoting {
         delete tx["tag"];
         delete tx["lease"];
         delete tx["note"];
-        console.log(tx);
 
         const signedTxn = await this.wallet.signTransaction(tx);
         const txID = signedTxn.txID;
 
-        console.log(signedTxn);
-        console.log("Signed transaction with txID: %s", this.deployTxID);
-
         await this.sendSignedTx(signedTxn.blob);
-        console.log("SENT");
-
         await this.waitForConfirmation(txID);
     }
 
