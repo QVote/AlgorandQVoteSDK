@@ -78,6 +78,10 @@ class QQueue {
     }
 
     async fetchState(){
+        if (typeof this.appID == 'undefined'){
+            throw 'Queue has not been initialized yet'
+        }
+
         const appData = await this.indexerClient.lookupApplications(this.appID).do();
         this.creatorAddress = appData.params.creator;
         const globalState = appData.params['global-state']
@@ -108,10 +112,6 @@ class QQueue {
                 }
             )
             .map(v => v[1])
-
-        console.log('size', this.size)
-        console.log('current index', this.currentIndex)
-        console.log(this.decisionIDS)
     }
 
      /**
@@ -160,9 +160,9 @@ class QQueue {
         return tx;
     }
 
-    // TODO 
-    async getDecisions() : Promise<string[]>{
-        return ;
+    async getDecisions() : Promise<number[]>{
+        await this.fetchState();
+        return this.decisionIDS;
     }
 
     async getSize() {
@@ -186,11 +186,47 @@ class QQueue {
         return tx;
     }
 
-    // async deployNew(creatorAddress: string){
+    async deployNew(){
+        const txParams = await this.client.getTransactionParams().do();
+        var tx = await this.buildDeployTx();
 
-    // }
+        ///@ts-ignore
+        tx['from'] = this.creatorAddress;
 
-    // TODO wallet methods 
+        //@ts-ignore
+        tx['genesisHash'] = txParams['genesisHash']
+
+        const signedTx = await this.wallet.signTransaction(tx);
+        const txID = signedTx.txID;
+        this.deployTxID = signedTx.txID;
+
+        //TODO update deployTxID
+        await this.sendSignedTx(signedTx.blob);
+        await this.waitForConfirmation(txID);
+
+        const appID = await this.getAppID()
+        await this.init(appID);
+        
+        return appID;
+    }
+
+    async optIn(userAddress : string) {
+
+        const txParams = await this.client.getTransactionParams().do();
+        var tx = await this.buildOptinTx(userAddress);
+        const signedTx = await this.wallet.signTransaction(tx);
+        const txID = signedTx.txID;
+
+        //@ts-ignore
+        tx['from'] = userAddress;
+        //@ts-ignore
+        tx['genesisHash'] = txParams['genesisHash']
+        
+        await this.sendSignedTx(signedTx.blob);
+        await this.waitForConfirmation(txID);
+
+    }
+
     async push(userAddress: string, decisionAppID: number) : Promise<void> {
         // make sure instance is initialized
         if (typeof this.appID == 'undefined'){
@@ -198,9 +234,14 @@ class QQueue {
         }
         const txParams = await this.client.getTransactionParams().do();
 
-        var pushTx = this.buildPushTx(userAddress, decisionAppID)
+        var pushTx = await this.buildPushTx(userAddress, decisionAppID);
+
+        //@ts-ignore 
         pushTx['from'] = userAddress;
+
+        //@ts-ignore
         pushTx['genesisHash'] = txParams['genesisHash']
+
         const signedTx = await this.wallet.signTransaction(pushTx);
         const txID = signedTx.txID;
         await this.sendSignedTx(signedTx.blob);

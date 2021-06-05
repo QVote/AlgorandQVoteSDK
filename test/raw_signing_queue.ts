@@ -84,7 +84,6 @@ import { mnemonicToSecretKey } from "algosdk";
     } 
 
     // TODO test with a lot of pushes on a very large queue 
-    
     // await deployNew();
     await logState(15988164);
     // await push(15988164);
