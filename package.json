@@ -1,0 +1,33 @@
+{
+  "name": "@qvote/algorand-sdk",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test_qvoting": "ts-node ./test/raw_signing_qvoting.ts",
+    "test_queue": "ts-node ./test/raw_signing_queue.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QVote/AlgorandQVoteSDK.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/QVote/AlgorandQVoteSDK/issues"
+  },
+  "homepage": "https://github.com/QVote/AlgorandQVoteSDK#readme",
+  "dependencies": {
+    "algosdk": "^1.9.1",
+    "bignumber.js": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.37",
+    "@typescript-eslint/eslint-plugin": "^4.25.0",
+    "@typescript-eslint/parser": "^4.25.0",
+    "dotenv": "^10.0.0",
+    "eslint": "^7.27.0",
+    "ts-node": "^10.0.0"
+  }
+}
