@@ -187,23 +187,15 @@ class QQueue {
     }
 
     async deployNew(){
-        const txParams = await this.client.getTransactionParams().do();
+        this.checkWalletSignMethod()
         var tx = await this.buildDeployTx();
 
-        ///@ts-ignore
-        tx['from'] = this.creatorAddress;
-
         //@ts-ignore
-        tx['genesisHash'] = txParams['genesisHash']
+        tx['from'] = this.creatorAddress;
+        //@ts-ignore
+        delete tx['appIndex'];
 
-        const signedTx = await this.wallet.signTransaction(tx);
-        const txID = signedTx.txID;
-        this.deployTxID = signedTx.txID;
-
-        //TODO update deployTxID
-        await this.sendSignedTx(signedTx.blob);
-        await this.waitForConfirmation(txID);
-
+        this.deployTxID = await this.signSendAndWait(tx)
         const appID = await this.getAppID()
         await this.init(appID);
         
@@ -211,41 +203,42 @@ class QQueue {
     }
 
     async optIn(userAddress : string) {
-
+        this.checkWalletSignMethod()
         const txParams = await this.client.getTransactionParams().do();
         var tx = await this.buildOptinTx(userAddress);
-        const signedTx = await this.wallet.signTransaction(tx);
-        const txID = signedTx.txID;
-
-        //@ts-ignore
+         //@ts-ignore
         tx['from'] = userAddress;
-        //@ts-ignore
+         //@ts-ignore
         tx['genesisHash'] = txParams['genesisHash']
-        
-        await this.sendSignedTx(signedTx.blob);
-        await this.waitForConfirmation(txID);
-
+        await this.signSendAndWait(tx);
     }
 
-    async push(userAddress: string, decisionAppID: number) : Promise<void> {
-        // make sure instance is initialized
-        if (typeof this.appID == 'undefined'){
-            throw "instance is not initialized"
-        }
+    async push(userAddress: string, decisionAppID : number ){
+        this.checkWalletSignMethod()
+        var tx = await this.buildPushTx(userAddress, decisionAppID)
         const txParams = await this.client.getTransactionParams().do();
 
-        var pushTx = await this.buildPushTx(userAddress, decisionAppID);
-
-        //@ts-ignore 
-        pushTx['from'] = userAddress;
-
         //@ts-ignore
-        pushTx['genesisHash'] = txParams['genesisHash']
+        tx['from'] = userAddress
+        //@ts-ignore
+        tx['genesisHash'] = txParams['genesisHash'] 
 
-        const signedTx = await this.wallet.signTransaction(pushTx);
+        await this.signSendAndWait(tx);
+    }
+
+    async signSendAndWait(tx) : Promise<string> {
+        this.checkWalletSignMethod()
+        const signedTx = await this.wallet.signTransaction(tx);
         const txID = signedTx.txID;
         await this.sendSignedTx(signedTx.blob);
         await this.waitForConfirmation(txID);
+        return txID;
+    }
+
+    checkWalletSignMethod(){
+        if (this.signMethod == 'raw'){
+            throw 'signing method has to be wallet'
+        }
     }
 
     // TODO like all other methods that simply use a client, this should go in utils once utils has it's own client 

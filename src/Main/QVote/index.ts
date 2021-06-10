@@ -6,7 +6,7 @@ import {
     makeApplicationOptInTxn,
     makeApplicationNoOpTxn,
     Transaction,
-    decodeAddress,
+    decodeAddress,   // DO NOT USE WITH myalgo
 } from "algosdk";
 import {
     intToByteArray,
@@ -31,7 +31,6 @@ class QVoting {
     private signMethod: "myalgo" | "raw";
     private wallet: any;
     private indexerClient: Indexer;
-
     private decimalPlaces = 1;
 
     /*
@@ -157,7 +156,7 @@ class QVoting {
     private async myAlgoPreprocessAddOptionTxs(
         txs: Transaction[]
     ): Promise<Transaction[]> {
-        return this.updateFromAndGenesisHash(txs, decodeAddress(this.creatorAddress));
+        return this.updateFromAndGenesisHash(txs, this.creatorAddress);
     }
 
     /**
@@ -170,7 +169,7 @@ class QVoting {
         txs: Transaction[],
         userAddress: string
     ): Promise<Transaction[]> {
-        return this.updateFromAndGenesisHash(txs, decodeAddress(userAddress));
+        return this.updateFromAndGenesisHash(txs, userAddress);
     }
 
     /**
@@ -181,12 +180,14 @@ class QVoting {
      */
     private async updateFromAndGenesisHash(
         txs: Transaction[],
-        from: Address
+        from: string 
     ): Promise<Transaction[]> {
         const txParams = await this.client.getTransactionParams().do();
         return txs.map((tx) => {
+            //@ts-ignore
             tx["from"] = from;
-            tx["genesisHash"] = Buffer.from(txParams["genesisHash"]);
+            //@ts-ignore
+            tx["genesisHash"] = txParams["genesisHash"];
             return tx;
         });
     }
@@ -204,52 +205,43 @@ class QVoting {
             throw "Can't deploy without wallet signing. You should probably call buildDeployTxs, then sign and send the txs yourself";
         }
 
-        const { appCreateTx, addOptionFns } = await this.buildDeployTxs();
+        var { appCreateTx, addOptionFns } = await this.buildDeployTxs();
+        const txParams = await this.client.getTransactionParams().do();
 
         // Creating Application
-        console.log("deploying app");
-        appCreateTx["from"] = decodeAddress(this.creatorAddress);
+        //@ts-ignore
+        appCreateTx["from"] = this.creatorAddress;  
         delete appCreateTx["appIndex"]; // apparently it thinks this is an app call otherwise
 
-        console.log(appCreateTx);
+        //@ts-ignore
+        appCreateTx["genesisHash"] = txParams["genesisHash"];
         const signedTxn = await this.wallet.signTransaction(appCreateTx);
+        
         this.deployTxID = signedTxn.txID; // overriding with the new txId
 
-        console.log(signedTxn);
-        console.log("Signed transaction with txID: %s", this.deployTxID);
-
         await this.sendSignedTx(signedTxn.blob);
-        console.log("SENT");
-
         await this.waitForConfirmation(this.deployTxID);
-        console.log("confirmed");
 
         this.appID = await this.getAppID();
 
         // Adding Options
         if (addOptionFns.length > 0) {
-            console.log("adding options");
 
             const addOptionTxs = await this.myAlgoPreprocessAddOptionTxs(
                 addOptionFns.map((f) => f(this.appID))
             );
-            console.log("good", addOptionTxs);
 
             // if length is 1 don't use map later down.
             const signedAddOtionTxs = await this.wallet.signTransaction(
                 addOptionTxs
             );
-            console.log("signed", signedAddOtionTxs);
 
             const addOptiontxIDs = signedAddOtionTxs.map((tx) => tx.txID);
-
             signedAddOtionTxs.map((tx) => this.sendSignedTx(tx.blob));
             addOptiontxIDs.map((txID) => {
                 this.waitForConfirmation(txID);
             });
         }
-
-        console.log("done");
     }
 
     /**
@@ -273,8 +265,11 @@ class QVoting {
         console.log(tx);
 
         const txParams = await this.client.getTransactionParams().do();
-        tx["from"] = decodeAddress(userAddress);
-        tx["genesisHash"] = Buffer.from(txParams["genesisHash"]);
+        //@ts-ignore
+        tx["from"] = userAddress;
+
+        //@ts-ignore
+        tx["genesisHash"] = txParams["genesisHash"];
         tx["appArgs"] = [];
         delete tx["tag"];
         delete tx["lease"];
