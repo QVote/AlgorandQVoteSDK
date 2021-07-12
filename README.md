@@ -18,7 +18,7 @@ This sdk is designed to help build applications that use quadratic voting. It's 
 # Installing 
 Make sure you have [algosdk](https://github.com/algorand/js-algorand-sdk) installed. 
 If you want to use internal signing, you will need also [myalgo conect](https://github.com/randlabs/myalgo-connect#Installation)
-The simply 
+Then simply 
 `https://github.com/algorand/js-algorand-sdk`
 
 # Using the SDK
