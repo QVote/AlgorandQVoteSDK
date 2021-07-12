@@ -19,7 +19,7 @@ This sdk is designed to help build applications that use quadratic voting. It's 
 Make sure you have [algosdk](https://github.com/algorand/js-algorand-sdk) installed. 
 If you want to use internal signing, you will need also [myalgo conect](https://github.com/randlabs/myalgo-connect#Installation)
 Then simply 
-`https://github.com/algorand/js-algorand-sdk`
+`npm install @qvote/algorand-sdk@1.0.0`
 
 # Using the SDK
 There are two intended ways to use this SDK: internal signing and external siging. In the first case the sdk will take care of everything for the developer. The methods interacting with the smart contracts will take even of signing (using only Myalgo Connect at the moment). In the second case, the SDK will provide the developer with the built transactions for any call to the smart contracts, and will let them sign them however they please. The signed transactions can then be given back to the SDK to be deployed. 
@@ -197,7 +197,7 @@ const state = await qv.readGlobalState();
 const qv = new QVoting(conf);
 await qv.initState(appID);
 
-// opt int with useAccount
+// opt int with userAccount
 const optInTx = await qv.buildOptInTx(userAccount.addr);
 const optInSigned = optInTx.signTxn(userAccount.sk);
 await qv.sendSignedTx(optInSigned);
